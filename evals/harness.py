@@ -392,9 +392,9 @@ def eval_task_016_parameterized_autonomous_dispatch() -> bool:
         test_prompt = "ya lo he configurado por favor puedes revisarlo y hacer una prueba de un Hello World para un minuto después de las alas mejor ponlo para las 4:09"
         
         assert engine.is_mcp_execution_intent(test_prompt) == "google-calendar"
-        title, parsed_time = engine.parse_calendar_parameters(test_prompt)
-        assert "Hello World" in title
-        assert "4:09" in parsed_time
+        params = engine.parse_calendar_parameters(test_prompt)
+        assert "Hello World" in params["title"]
+        assert "16:09" in params["time"] or "04:09" in params["time"] or "4:09" in params["time_display"]
 
         async def _test():
             augmented, trace = await engine.process_reasoning_loop(test_prompt)
@@ -432,9 +432,40 @@ def eval_task_017_real_google_calendar_api() -> bool:
         return False
 
 
+def eval_task_018_nlp_calendar_extraction() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-018: Extracción NLP Avanzada y Descripciones Amables...")
+    try:
+        from core.services.reasoning_engine import AutonomousReasoningEngine
+        from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+        from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
+        from adapters.tools.mcp_runtime_adapter import MCPRuntimeAdapter
+        from core.services.grounding_service import GroundingService
+
+        engine = AutonomousReasoningEngine(
+            grounding_service=GroundingService(DuckDuckGoSearchAdapter()),
+            mcp_manager=MCPManagerAdapter(),
+            mcp_runtime=MCPRuntimeAdapter()
+        )
+
+        test_prompt = "Quiero que me hagas un evento para las 5:15 de la tarde del 1 de septiembre del 2026 el evento llámalo preparación para ir al cine Planet de 2 de mayo"
+
+        params = engine.parse_calendar_parameters(test_prompt)
+        assert "Preparación para ir al cine Planet de 2 de mayo" in params["title"], f"Título erróneo: {params['title']}"
+        assert params["date"] == "2026-09-01", f"Fecha errónea: {params['date']}"
+        assert params["time"] == "17:15:00", f"Hora errónea: {params['time']}"
+        assert "Cineplanet" in params["location"] or "2 de Mayo" in params["location"], f"Ubicación errónea: {params['location']}"
+        assert "🎬 Recordatorio" in params["description"], "Descripción amable no generada"
+
+        print("✅ [EVAL TASK-018] Superada: Título exacto, fecha '2026-09-01', hora '17:15:00', ubicación y descripción amable extraídas exitosamente.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-018] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-017)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-018)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -458,7 +489,8 @@ def main():
         ("TASK-014", eval_task_014_server_side_persistence),
         ("TASK-015", eval_task_015_ide_workbench_layout),
         ("TASK-016", eval_task_016_parameterized_autonomous_dispatch),
-        ("TASK-017", eval_task_017_real_google_calendar_api)
+        ("TASK-017", eval_task_017_real_google_calendar_api),
+        ("TASK-018", eval_task_018_nlp_calendar_extraction)
     ]
 
     for task_id, fn in tasks:

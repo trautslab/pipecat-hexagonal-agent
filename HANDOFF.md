@@ -6,19 +6,23 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `1.4.0`
+- **Versión:** `1.5.0`
 - **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
-- **Estado General:** `ESTABLE / INTEGRACIÓN REAL GOOGLE CALENDAR API v3 Y OAUTH2 COMPLETADA`
+- **Estado General:** `ESTABLE / EXTRACTOR NLP DE EVENTOS Y DESCRIPCIONES AMABLES COMPLETADO`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
-1. **Google Calendar API v3 Real (`GoogleCalendarClient`):** Llamadas REST directas a `https://www.googleapis.com/calendar/v3/calendars/primary/events` con soporte para tokens persistidos en `.agents/tokens/google_token.json`.
-2. **Flujo OAuth2 en 1 Clic (`/oauth2callback`):** Generación de consent URL con credenciales de `.env` y captura automática de códigos.
-3. **Botones Interactivos en UI:** Botón `[🔑 Autorizar Google Calendar en 1 Clic]` y botón `[📅 Ver Evento en Google Calendar]`.
-4. **Layout Postman / Modern IDE Workbench:** 5 zonas de trabajo con visualizador de audio, visor de respuestas y consola ReAct en vivo.
-5. **Gobernanza AI-SDLC:** `UC-001` a `UC-015`, `TASK-001` a `TASK-017`, `SEQ-001` a `SEQ-013`, `ADR-0001` a `ADR-0014`.
-6. **Eval Harness & Invariantes:** 17/17 tareas y 5/5 unit tests verificados con `demo_live.sh`.
+1. **Extractor NLP de Eventos (`AutonomousReasoningEngine`):**
+   - Títulos nombrados con cláusulas (`llámalo preparación para ir al cine Planet de 2 de mayo`).
+   - Fechas explícitas completas (`1 de septiembre del 2026` -> `2026-09-01`).
+   - Horas con modificadores (`5:15 de la tarde` -> `17:15:00`).
+   - Detección de ubicaciones (`Cineplanet - 2 de Mayo`).
+   - Generación de descripciones enriquecidas amables con recordatorios.
+2. **Google Calendar API v3 Real & OAuth2:** Inserción física en la cuenta de Google con enlaces directos (`htmlLink`).
+3. **Layout Postman / Modern IDE Workbench:** 5 zonas de trabajo con visualizador de audio, visor de respuestas y consola ReAct en vivo.
+4. **Gobernanza AI-SDLC:** `UC-001` a `UC-016`, `TASK-001` a `TASK-018`, `SEQ-001` a `SEQ-014`, `ADR-0001` a `ADR-0015`.
+5. **Eval Harness & Invariantes:** 18/18 tareas y 5/5 unit tests verificados con `demo_live.sh`.
 
 ---
 

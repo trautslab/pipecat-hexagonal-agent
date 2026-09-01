@@ -43,7 +43,8 @@ class AutonomousReasoningEngine:
         target_date = None
         date_display = now.strftime("%d/%m/%Y")
 
-        date_match = re.search(r'\b(\d{1,2})\s+de\s+([a-zA-Záéíóúñ]+)(?:\s+del?\s+(\d{4}))?\b', t)
+        months_pattern = r'(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)'
+        date_match = re.search(rf'\b(\d{{1,2}})\s+de\s+({months_pattern})(?:\s+del?\s+(\d{{4}}))?\b', t)
         if date_match:
             day = int(date_match.group(1))
             month_name = date_match.group(2).lower()
