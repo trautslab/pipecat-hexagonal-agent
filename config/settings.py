@@ -32,6 +32,7 @@ class TTSProviderType(str, Enum):
 class TransportProviderType(str, Enum):
     LOCAL_AUDIO = "local_audio"
     DAILY_WEBRTC = "daily_webrtc"
+    WEBSOCKET = "websocket"
     MOCK = "mock"
 
 
@@ -79,6 +80,10 @@ if HAS_PYDANTIC:
         daily_room_url: Optional[str] = Field(default=None, alias="DAILY_ROOM_URL")
         daily_token: Optional[str] = Field(default=None, alias="DAILY_TOKEN")
 
+        # Configuración Servidor Web
+        web_host: str = Field(default="0.0.0.0", alias="WEB_HOST")
+        web_port: int = Field(default=8765, alias="WEB_PORT")
+
 else:
     @dataclass
     class AppSettings:
@@ -112,6 +117,9 @@ else:
 
         daily_room_url: Optional[str] = None
         daily_token: Optional[str] = None
+
+        web_host: str = "0.0.0.0"
+        web_port: int = 8765
 
         def __init__(self, **kwargs):
             for key, val in kwargs.items():

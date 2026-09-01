@@ -25,6 +25,7 @@ from adapters.tts.piper_adapter import PiperLocalTTSAdapter
 from adapters.tts.cartesia_adapter import CartesiaTTSAdapter
 from adapters.transport.local_audio_adapter import LocalAudioTransportAdapter
 from adapters.transport.daily_webrtc_adapter import DailyWebRTCTransportAdapter
+from adapters.transport.websocket_transport_adapter import WebSocketTransportAdapter
 from adapters.mock_adapters import (
     MockSTTAdapter,
     MockLLMAdapter,
@@ -107,6 +108,8 @@ class AgentFactory:
                     token=config.daily_token,
                     bot_name=config.agent_name
                 )
+            case TransportProviderType.WEBSOCKET:
+                return WebSocketTransportAdapter()
             case _:
                 return MockTransportAdapter()
 
