@@ -1,7 +1,7 @@
 /**
- * Aura Voice AI - Web Client v0.5.0
+ * Aura Voice AI - Web Client v0.6.0
  * Soporte para Historial de Conversaciones Persistente (ChatGPT/Claude UI),
- * Botón de Copiado Inteligente, AudioContext Canvas Visualizer y Streaming WebSocket.
+ * Visualización de Ciclo ReAct / OpenClaw Thoughts, Botón de Copiado y Streaming WebSocket.
  */
 
 class VoiceAgentApp {
@@ -108,8 +108,9 @@ class VoiceAgentApp {
       messages: [
         {
           role: "bot",
-          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. ¿En qué puedo colaborar o qué herramienta deseas configurar hoy?",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con un motor de razonamiento autónomo para investigar en internet y autoinstalarme herramientas MCP (como Google Calendar o bases de datos). ¿Qué deseas construir o consultar hoy?",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          trace: []
         }
       ]
     };
@@ -131,10 +132,9 @@ class VoiceAgentApp {
     this.currentChatTitle.textContent = session.title;
     localStorage.setItem("aura_active_session", sessionId);
 
-    // Renderizar mensajes de la sesión
     this.captionsStream.innerHTML = "";
     session.messages.forEach(m => {
-      this.renderMessageBubble(m.role, m.text, m.time, false);
+      this.renderMessageBubble(m.role, m.text, m.time, false, m.trace);
     });
     this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
 
@@ -176,29 +176,50 @@ class VoiceAgentApp {
     });
   }
 
-  addMessageToCurrentSession(role, text) {
+  addMessageToCurrentSession(role, text, trace = []) {
     const session = this.sessions.find(s => s.id === this.currentSessionId);
     if (!session) return;
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    session.messages.push({ role, text, time });
+    session.messages.push({ role, text, time, trace });
 
-    // Auto-generar título si es la primera pregunta del usuario
     if (role === "user" && (session.title === "Nueva Conversación" || session.title.startsWith("Conversación"))) {
       session.title = text.length > 28 ? text.substring(0, 28) + "..." : text;
       this.currentChatTitle.textContent = session.title;
     }
 
     this.saveSessions();
-    this.renderMessageBubble(role, text, time, true);
+    this.renderMessageBubble(role, text, time, true, trace);
   }
 
   /* ============================================================================
-     3. RENDER MESSAGE BUBBLE WITH COPY BUTTON
+     3. RENDER MESSAGE BUBBLE WITH THOUGHT TRACE & COPY BUTTON
      ============================================================================ */
-  renderMessageBubble(role, text, time, autoScroll = true) {
+  renderMessageBubble(role, text, time, autoScroll = true, trace = []) {
     const bubble = document.createElement("div");
     bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
+
+    let thoughtHtml = "";
+    if (trace && trace.length > 0) {
+      const stepsHtml = trace.map(step => {
+        let icon = "🧠";
+        if (step.kind === "action") icon = "⚙️";
+        if (step.kind === "observation") icon = "✅";
+        return `
+          <div class="thought-step">
+            <span class="thought-icon">${icon}</span>
+            <div><strong>${step.title}:</strong> ${step.detail}</div>
+          </div>
+        `;
+      }).join("");
+
+      thoughtHtml = `
+        <div class="thought-box">
+          <div class="thought-header">⚡ Razonamiento Autónomo ReAct</div>
+          ${stepsHtml}
+        </div>
+      `;
+    }
 
     bubble.innerHTML = `
       <div class="bubble-header">
@@ -210,6 +231,7 @@ class VoiceAgentApp {
           </button>
         </div>
       </div>
+      ${thoughtHtml}
       <div class="bubble-text">${this.formatText(text)}</div>
     `;
 
@@ -223,7 +245,6 @@ class VoiceAgentApp {
   }
 
   formatText(text) {
-    // Si contiene bloques de código o comandos
     return text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
   }
 
@@ -237,7 +258,6 @@ class VoiceAgentApp {
         btnElement.innerHTML = "<span>📋</span> Copiar";
       }, 2000);
     } catch (e) {
-      // Fallback
       const ta = document.createElement("textarea");
       ta.value = text;
       document.body.appendChild(ta);
@@ -306,8 +326,6 @@ class VoiceAgentApp {
     if (!('speechSynthesis' in window)) return;
     
     window.speechSynthesis.cancel();
-
-    // Limpiar posibles bloques de código de la locución hablada
     const cleanSpokenText = text.replace(/```[\s\S]*?```/g, ' Código adjunto en pantalla. ');
 
     const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
@@ -410,7 +428,6 @@ class VoiceAgentApp {
         console.log("🗣️ Transcripción detectada:", transcript);
         this.addMessageToCurrentSession("user", transcript);
 
-        // Enviar con contexto de sesión
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
           const session = this.sessions.find(s => s.id === this.currentSessionId);
           this.socket.send(JSON.stringify({
@@ -449,7 +466,7 @@ class VoiceAgentApp {
     this.socket.binaryType = "arraybuffer";
 
     this.socket.onopen = () => {
-      console.log("✅ WebSocket conectado.");
+      console.log("✅ WebSocket conectado con ReAct Engine.");
       this.setStatus("connected", "Escuchando");
     };
 
@@ -458,16 +475,20 @@ class VoiceAgentApp {
         try {
           const msg = JSON.parse(event.data);
           
-          if (msg.type === "caption") {
+          if (msg.type === "thought") {
+            if (msg.step && msg.step.title) {
+              this.setStatus("listening", msg.step.title);
+            }
+          } else if (msg.type === "caption") {
             if (msg.text) {
-              this.addMessageToCurrentSession(msg.role || "bot", msg.text);
+              this.addMessageToCurrentSession(msg.role || "bot", msg.text, msg.trace || []);
               if (msg.speak) {
                 this.speakText(msg.text);
               }
             }
           } else if (msg.type === "status") {
             if (msg.state === "thinking") {
-              this.setStatus("listening", msg.label || "Pensando...");
+              this.setStatus("listening", msg.label || "Razonando...");
             } else if (msg.state === "connected") {
               if (!this.isSpeaking) {
                 this.setStatus("connected", msg.label || "Escuchando");

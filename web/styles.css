@@ -801,6 +801,44 @@ body {
   }
 }
 
+/* Thought Trace Box (ReAct OpenClaw Style) */
+.thought-box {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px dashed var(--border-highlight);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.thought-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.thought-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.thought-step:last-child {
+  margin-bottom: 0;
+}
+
+  }
+}
+
 @media (max-width: 640px) {
   .providers-grid {
     grid-template-columns: 1fr;
