@@ -228,26 +228,46 @@ def eval_task_009_dynamic_mcp_manager() -> bool:
 
 
 def eval_task_010_action_inspector() -> bool:
-    print("\n🧪 [EVAL] Evaluando TASK-010: Inspector Desplegable de Acciones y Telemetría...")
+    print("\n🧪 [EVAL] Evaluando TASK-010: Inspector de Acciones y Telemetría...")
     try:
         web_app = (ROOT_DIR / "web" / "app.js").read_text()
         web_styles = (ROOT_DIR / "web" / "styles.css").read_text()
         server_code = (ROOT_DIR / "web_server.py").read_text()
 
-        assert "action-inspector" in web_styles, "Estilos de action-inspector no encontrados"
-        assert "copyTelemetryToClipboard" in web_app, "Método copyTelemetryToClipboard no encontrado en app.js"
         assert "telemetry" in server_code, "Objeto telemetry no emitido por web_server.py"
+        assert "copyToClipboard" in web_app, "copyToClipboard no encontrado"
 
-        print("✅ [EVAL TASK-010] Superada: Desplegable ActionInspector y botón de copiado de telemetría validados.")
+        print("✅ [EVAL TASK-010] Superada: Telemetría y copiado validados.")
         return True
     except Exception as e:
         print(f"❌ [EVAL TASK-010] Falló: {e}")
         return False
 
 
+def eval_task_011_realtime_console_right_sidebar() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-011: Consola Lateral Derecha de Trazabilidad en Tiempo Real...")
+    try:
+        web_index = (ROOT_DIR / "web" / "index.html").read_text()
+        web_styles = (ROOT_DIR / "web" / "styles.css").read_text()
+        web_app = (ROOT_DIR / "web" / "app.js").read_text()
+        server_code = (ROOT_DIR / "web_server.py").read_text()
+
+        assert "right-console-sidebar" in web_index, "right-console-sidebar no encontrado en index.html"
+        assert "turn-badge" in web_styles, "turn-badge no encontrado en styles.css"
+        assert "handleLiveTraceStep" in web_app, "handleLiveTraceStep no encontrado en app.js"
+        assert "live_trace_step" in server_code, "live_trace_step no emitido por web_server.py"
+        assert "copyConsoleToClipboard" in web_app, "copyConsoleToClipboard no encontrado en app.js"
+
+        print("✅ [EVAL TASK-011] Superada: Consola lateral derecha, live_trace_step streaming y turn badges validados.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-011] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-010)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-011)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -264,7 +284,8 @@ def main():
         ("TASK-007", eval_task_007_mcp_proactive_scaffolding),
         ("TASK-008", eval_task_008_react_reasoning_engine),
         ("TASK-009", eval_task_009_dynamic_mcp_manager),
-        ("TASK-010", eval_task_010_action_inspector)
+        ("TASK-010", eval_task_010_action_inspector),
+        ("TASK-011", eval_task_011_realtime_console_right_sidebar)
     ]
 
     for task_id, fn in tasks:

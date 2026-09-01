@@ -6,19 +6,22 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `0.7.0`
+- **Versión:** `0.8.0`
 - **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
-- **Estado General:** `ESTABLE / INSPECTOR DESPLEGABLE DE ACCIONES Y TELEMETRÍA CON COPIADO COMPLETADO`
+- **Estado General:** `ESTABLE / CONSOLA LATERAL DERECHA DE TRAZABILIDAD EN TIEMPO REAL Y NUMERACIÓN CORRELATIVA COMPLETADAS`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
-1. **Inspector Desplegable de Acciones (`ActionInspector`):** Acordeón colapsable con el registro 100% transparente de operaciones (ReAct, WebSearch, MCP, archivos modificados, timestamps y latencia).
-2. **Botón `[📋 Copiar Registro]`:** Exportación instantánea al portapapeles de la traza técnica en formato Markdown para feedback y debugging.
-3. **Motor ReAct Autónomo & MCP Manager (OpenClaw):** Capacidad de auto-descubrimiento y autoinstalación de herramientas MCP.
-4. **Sidebar de Historial & Botón de Copiado de Mensajes:** Interfaz tipo ChatGPT / Claude UI con persistencia en `localStorage`.
-5. **Gobernanza AI-SDLC:** `UC-001` a `UC-008`, `TASK-001` a `TASK-010`, `SEQ-001` a `SEQ-006`, `ADR-0001` a `ADR-0007`.
-6. **Eval Harness & Invariantes:** 10/10 tareas y 5/5 unit tests verificados con `demo_live.sh`.
+1. **Layout de 3 Columnas:**
+   - **Izquierda:** Historial de sesiones guardadas en `localStorage` (ChatGPT / Claude UI).
+   - **Centro:** Interacción de voz en vivo, canvas reactivo y chat limpio con numeración correlativa (`#1`, `#2`, ...).
+   - **Derecha (Right Sidebar Console):** Consola de telemetría en tiempo real con acordeones colapsables por turno.
+2. **Streaming en Vivo (`live_trace_step`):** Los pensamientos ReAct, búsquedas y acciones MCP se transmiten inmediatamente por WebSocket al ocurrir.
+3. **Botón `[📋 Copiar Consola]`:** Exportación instantánea al portapapeles de la traza de toda la sesión en formato Markdown estructurado.
+4. **Motor ReAct Autónomo & MCP Manager (OpenClaw):** Autoinstalación de herramientas en `.agents/mcp/` y `.env`.
+5. **Gobernanza AI-SDLC:** `UC-001` a `UC-009`, `TASK-001` a `TASK-011`, `SEQ-001` a `SEQ-007`, `ADR-0001` a `ADR-0008`.
+6. **Eval Harness & Invariantes:** 11/11 tareas y 5/5 unit tests verificados con `demo_live.sh`.
 
 ---
 

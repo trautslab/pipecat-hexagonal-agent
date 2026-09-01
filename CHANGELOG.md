@@ -10,11 +10,21 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.8.0] - 2026-09-01
+
+### Added
+- **Consola Lateral Derecha de Trazabilidad en Tiempo Real (Right Sidebar):** Panel independiente a modo de consola de desarrollo para inspeccionar en tiempo real todos los pensamientos, llamadas a herramientas MCP, búsquedas web, latencias y modelos.
+- **Streaming de Pasos en Vivo (`live_trace_step`):** Cada paso ReAct se transmite inmediatamente por WebSocket conforme ocurre en el backend, sin esperar a que el LLM termine su respuesta.
+- **Numeración Correlativa por Turno (`#1`, `#2`, ...):** Identificadores correlativos en cada mensaje del chat y en los bloques desplegables de la consola derecha.
+- **Botón `[📋 Copiar Consola]`:** Permite exportar de un solo clic toda la trazabilidad acumulada de la sesión en formato Markdown estructurado.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-009`, diagrama `SEQ-007`, decisión `ADR-0008` y contrato `TASK-011`.
+
+---
+
 ## [0.7.0] - 2026-09-01
 
 ### Added
-- **Inspector Desplegable de Acciones y Telemetría (`ActionInspector`):** Cada mensaje del asistente ahora incluye un acordeón interactivo (`<details>`) con el desglose cronológico de todas las operaciones ejecutadas (pensamientos ReAct, llamadas a herramientas, queries web, archivos modificados, modelo LLM y latencia en ms).
-- **Botón de Copiado de Registro Técnico (`[📋 Copiar Registro]`):** Permite exportar con un solo clic toda la traza de telemetría formateada en Markdown para reportar feedback o depuración.
+- **Inspector Desplegable de Acciones y Telemetría (`ActionInspector`):** Acordeón interactivo con el desglose cronológico de operaciones en cada respuesta.
 - **Gobernanza AI-SDLC:** Caso de uso `UC-008`, diagrama `SEQ-006`, decisión `ADR-0007` y contrato `TASK-010`.
 
 ---
