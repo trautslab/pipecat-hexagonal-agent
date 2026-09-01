@@ -6,19 +6,18 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `0.9.0`
+- **Versión:** `1.1.0`
 - **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
-- **Estado General:** `ESTABLE / EJECUTOR ACTIVO DE HERRAMIENTAS MCP Y SONDA DE GOOGLE CALENDAR COMPLETADOS`
+- **Estado General:** `ESTABLE / PERSISTENCIA EN SERVIDOR Y RUNTIME AUTÓNOMO DE MCPs COMPLETADOS`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
-1. **Ejecutor Activo de Herramientas MCP (`MCPExecutorAdapter`):** Verificación de credenciales en `.env` y ejecución de acciones reales sin alucinaciones.
-2. **Sonda Proactiva de Google Calendar:** Creación de evento de prueba *"Hello World"* para `now + 1 min` con confirmación en tiempo real.
-3. **Consola Lateral Derecha & Streaming ReAct en Vivo:** Panel independiente con streaming de pasos (`live_trace_step`) y botón `[📋 Copiar Consola]`.
-4. **Numeración Correlativa por Turno:** Badges `#1`, `#2`, etc. en chat y acordeones correspondientes en la consola derecha.
-5. **Gobernanza AI-SDLC:** `UC-001` a `UC-010`, `TASK-001` a `TASK-012`, `SEQ-001` a `SEQ-008`, `ADR-0001` a `ADR-0009`.
-6. **Eval Harness & Invariantes:** 12/12 tareas y 5/5 unit tests verificados con `demo_live.sh`.
+1. **Persistencia en el Servidor Desacoplada del Navegador (`FileSessionRepositoryAdapter`):** Almacenamiento agnóstico a clientes en `.agents/sessions/<session_id>.json`.
+2. **Consola Lateral Derecha con Persistencia Backend:** Los logs de la consola se guardan en el servidor en tiempo real.
+3. **Motor Autónomo de MCPs y Cero Comandos Manuales:** El agente ejecuta todas las herramientas por su cuenta (`MCPRuntimeAdapter`).
+4. **Gobernanza AI-SDLC:** `UC-001` a `UC-012`, `TASK-001` a `TASK-014`, `SEQ-001` a `SEQ-010`, `ADR-0001` a `ADR-0011`.
+5. **Eval Harness & Invariantes:** 14/14 tareas y 5/5 unit tests verificados con `demo_live.sh`.
 
 ---
 

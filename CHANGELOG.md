@@ -10,11 +10,29 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.1.0] - 2026-09-01
+
+### Added
+- **Persistencia en el Servidor Desacoplada del Navegador (`SessionRepositoryPort` & `FileSessionRepositoryAdapter`):** Almacenamiento agnóstico a clientes en `.agents/sessions/<session_id>.json`. Permite cambiar de navegador (Chrome, Safari, Firefox) o migrar a una futura app móvil manteniendo el historial conversacional y la trazabilidad de la consola intactos.
+- **Endpoints REST de Sesiones (`/api/sessions`):** API para consulta (`GET`), persistencia (`POST`) y eliminación (`DELETE`) de conversaciones y eventos de telemetría.
+- **Persistencia en Tiempo Real de Pasos ReAct:** Cada pensamiento y acción emitido en la consola derecha se almacena automáticamente en el disco del backend.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-012`, diagrama `SEQ-010`, decisión `ADR-0011` y contrato `TASK-014`.
+
+---
+
+## [1.0.0] - 2026-09-01
+
+### Added
+- **Motor Autónomo de Ejecución de MCPs (`MCPRuntimePort` & `MCPRuntimeAdapter`):** Ejecución 100% interna de subprocesos y herramientas MCP en segundo plano.
+- **Prohibición Estricta de Directivas Pasivas:** El System Prompt y el motor ReAct tienen estrictamente prohibido sugerir comandos manuales en la terminal al usuario (`npm run...`, etc.), ejecutando todas las acciones de forma autónoma.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-011`, diagrama `SEQ-009`, decisión `ADR-0010` y contrato `TASK-013`.
+
+---
+
 ## [0.9.0] - 2026-09-01
 
 ### Added
-- **Ejecutor Activo de Herramientas MCP (`MCPExecutorPort` & `MCPExecutorAdapter`):** Permite al agente validar credenciales en `.env` e invocar de manera real las herramientas de los servidores MCP sin solicitar configuraciones manuales o alucinar comandos.
-- **Sonda Proactiva de Google Calendar (*Hello World*):** Al detectar credenciales configuradas, el agente agenda automáticamente un evento de prueba en Google Calendar programado para `now + 1 minuto`.
+- **Ejecutor Activo de Herramientas MCP (`MCPExecutorPort` & `MCPExecutorAdapter`):** Validación de credenciales en `.env` y sonda de prueba de Google Calendar (*Hello World* en `now + 1 min`).
 - **Gobernanza AI-SDLC:** Caso de uso `UC-010`, diagrama `SEQ-008`, decisión `ADR-0009` y contrato `TASK-012`.
 
 ---
@@ -23,8 +41,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Added
 - **Consola Lateral Derecha de Trazabilidad en Tiempo Real (Right Sidebar):** Panel independiente a modo de consola de desarrollo para inspeccionar en tiempo real todos los pensamientos, llamadas a herramientas MCP, búsquedas web, latencias y modelos.
-- **Streaming de Pasos en Vivo (`live_trace_step`):** Cada paso ReAct se transmite inmediatamente por WebSocket conforme ocurre en el backend, sin esperar a que el LLM termine su respuesta.
-- **Numeración Correlativa por Turno (`#1`, `#2`, ...):** Identificadores correlativos en cada mensaje del chat y en los bloques desplegables de la consola derecha.
+- **Streaming de Pasos en Vivo (`live_trace_step`):** Cada paso ReAct se transmite inmediatamente por WebSocket conforme ocurre en el backend.
+- **Numeración Correlativa por Turno (`#1`, `#2`, ...):** Identificadores correlativos en cada mensaje del chat y en la consola derecha.
 - **Botón `[📋 Copiar Consola]`:** Permite exportar de un solo clic toda la trazabilidad acumulada de la sesión en formato Markdown estructurado.
 - **Gobernanza AI-SDLC:** Caso de uso `UC-009`, diagrama `SEQ-007`, decisión `ADR-0008` y contrato `TASK-011`.
 
@@ -41,42 +59,39 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [0.6.0] - 2026-09-01
 
 ### Added
-- **Motor de Razonamiento Autónomo ReAct (Estilo OpenClaw / OpenHands):** Implementación de `AutonomousReasoningEngine` en `core/services/` para ejecutar bucles multi-paso (*Thought -> Action -> Observation -> Synthesis*).
-- **Gestor Dinámico de Herramientas MCP (`MCPPort` & `MCPManagerAdapter`):** Permite al agente descubrir paquetes MCP en npm/GitHub, autoinstalar servidores en `.agents/mcp/mcp-servers.json` y declarar variables en `.env` (ej. Google Calendar MCP).
-- **Gobernanza AI-SDLC:** Caso de uso `UC-007`, diagrama `SEQ-005`, decisión `ADR-0006` y contratos `TASK-008` / `TASK-009`.
+- **Motor de Razonamiento Autónomo ReAct (Estilo OpenClaw / OpenHands):** Implementación de `AutonomousReasoningEngine` en `core/services/`.
+- **Gestor Dinámico de Herramientas MCP (`MCPPort` & `MCPManagerAdapter`):** Autoinstalación de servidores en `.agents/mcp/mcp-servers.json` y `.env`.
 
 ---
 
 ## [0.5.0] - 2026-09-01
 
 ### Added
-- **Sidebar de Historial de Conversaciones (ChatGPT / Claude UI):** Panel lateral retráctil con lista de chats guardados, botón `+ Nueva Conversación` y persistencia automática en `localStorage`.
-- **Botón de Copiado Rápido (📋):** Icono de copiado en cada burbuja de mensaje con feedback interactivo (`✓ ¡Copiado!`).
-- **Memoria Conversacional Multi-Turno:** El servidor mantiene el contexto de los mensajes de la sesión activa en Ollama.
+- **Sidebar de Historial de Conversaciones (ChatGPT / Claude UI):** Panel lateral retráctil con lista de chats guardados y botón `+ Nueva Conversación`.
+- **Botón de Copiado Rápido (📋):** Icono de copiado en cada burbuja de mensaje con feedback interactivo.
 
 ---
 
 ## [0.4.0] - 2026-09-01
 
 ### Added
-- **Herramienta de Búsqueda Web en Tiempo Real (`SearchPort` & `DuckDuckGoSearchAdapter`):** Permite al agente buscar información en internet a costo $0 sin requerir API keys.
-- **Servicio de Grounding Anti-Alucinaciones (`GroundingService`):** Detecta preguntas factuales/geográficas y compone prompts enriquecidos con evidencias reales de internet antes de consultar al LLM.
+- **Herramienta de Búsqueda Web en Tiempo Real (`SearchPort` & `DuckDuckGoSearchAdapter`):** Costo $0 sin API keys.
+- **Servicio de Grounding Anti-Alucinaciones (`GroundingService`):** Detección de preguntas factuales y composición de evidencias.
 
 ---
 
 ## [0.3.0] - 2026-09-01
 
 ### Added
-- **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia en `localStorage`.
-- **Servidor WebSocket RFC 6455 Nativo:** Implementación en `web_server.py` de handshake y framing de WebSocket binario/texto.
+- **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia.
+- **Servidor WebSocket RFC 6455 Nativo:** Framing de WebSocket binario/texto.
 
 ---
 
 ## [0.2.0] - 2026-09-01
 
 ### Added
-- **Interfaz Web Interactiva (`web/`):** Cliente web en HTML/CSS/JS con diseño Glassmorphism, visualizador de ondas y subtítulos en streaming.
-- **Adaptador de Transporte WebSocket (`WebSocketTransportAdapter`):** Permite la transmisión de tramas de audio PCM de baja latencia con el navegador.
+- **Interfaz Web Interactiva (`web/`):** Cliente web con diseño Glassmorphism y visualizador de ondas.
 
 ---
 
@@ -84,6 +99,4 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Added
 - Arquitectura Hexagonal con puertos `STTPort`, `LLMPort`, `TTSPort` y `TransportPort`.
-- Core orquestador `VoiceAgentPipelineBuilder` con soporte para interrupciones (*barge-in*).
-- Adaptadores locales 100% gratuitos para Faster-Whisper, Ollama, Piper/Kokoro TTS y Audio local.
-- Gobernanza AI-SDLC completa.
+- Pila local 100% gratuita para Faster-Whisper, Ollama y Piper TTS.
