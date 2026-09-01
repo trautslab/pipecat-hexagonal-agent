@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from config.logger_config import logger
+from core.ports.mcp_port import MCPPort
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 MCP_CONFIG_PATH = PROJECT_ROOT / ".agents" / "mcp" / "mcp-servers.json"
@@ -48,7 +49,7 @@ KNOWN_MCP_SERVERS = {
 }
 
 
-class MCPManagerAdapter:
+class MCPManagerAdapter(MCPPort):
     """
     Adaptador para la gestión dinámica e instalación de Servidores MCP (Model Context Protocol).
     Actualiza .agents/mcp/mcp-servers.json y declara credenciales en .env.
@@ -80,7 +81,6 @@ class MCPManagerAdapter:
         
         # Detección genérica de "instalar mcp", "conectar mcp", "instalarte herramienta"
         if "mcp" in t and ("instala" in t or "conecta" in t or "configura" in t or "agrega" in t):
-            # Extraer posible nombre
             match = re.search(r"(?:instala|conecta|configura|agrega)\s+(?:el\s+mcp\s+de\s+|mcp\s+)?([a-zA-Z0-9_-]+)", t)
             if match:
                 return match.group(1).lower()
@@ -92,7 +92,6 @@ class MCPManagerAdapter:
 
         info = KNOWN_MCP_SERVERS.get(server_key)
         if not info:
-            # Configuración genérica npx
             info = {
                 "command": "npx",
                 "args": ["-y", f"mcp-server-{server_key}"],
@@ -112,7 +111,6 @@ class MCPManagerAdapter:
         if "mcpServers" not in config:
             config["mcpServers"] = {}
 
-        # Mapear variables de entorno a referencias ${VAR}
         env_mapping = {}
         for var_name in info["env_vars"]:
             env_mapping[var_name] = f"${{{var_name}}}"
@@ -124,7 +122,6 @@ class MCPManagerAdapter:
             "description": info["description"]
         }
 
-        # Escribir archivo mcp-servers.json
         self.mcp_file.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
         logger.info(f"✅ [MCPManager] .agents/mcp/mcp-servers.json actualizado con '{server_key}'.")
 

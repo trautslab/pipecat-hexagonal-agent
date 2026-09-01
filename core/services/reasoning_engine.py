@@ -2,7 +2,7 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from config.logger_config import logger
 from core.services.grounding_service import GroundingService
-from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
+from core.ports.mcp_port import MCPPort
 
 
 class AutonomousReasoningEngine:
@@ -11,7 +11,7 @@ class AutonomousReasoningEngine:
     Orquesta pensamientos, descubrimiento web, autoinstalación de MCPs y generación final.
     """
 
-    def __init__(self, grounding_service: GroundingService, mcp_manager: MCPManagerAdapter):
+    def __init__(self, grounding_service: GroundingService, mcp_manager: MCPPort):
         self.grounding = grounding_service
         self.mcp_mgr = mcp_manager
 
@@ -19,7 +19,7 @@ class AutonomousReasoningEngine:
         self,
         user_prompt: str,
         history: Optional[List[Dict[str, str]]] = None,
-        on_thought_callback: Optional[Callable[[str], Any]] = None
+        on_thought_callback: Optional[Callable[[Dict[str, str]], Any]] = None
     ) -> Tuple[str, List[Dict[str, str]]]:
         """
         Ejecuta el ciclo ReAct:

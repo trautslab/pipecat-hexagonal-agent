@@ -10,14 +10,22 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.6.0] - 2026-09-01
+
+### Added
+- **Motor de Razonamiento Autónomo ReAct (Estilo OpenClaw / OpenHands):** Implementación de `AutonomousReasoningEngine` en `core/services/` para ejecutar bucles multi-paso (*Thought -> Action -> Observation -> Synthesis*).
+- **Gestor Dinámico de Herramientas MCP (`MCPPort` & `MCPManagerAdapter`):** Permite al agente descubrir paquetes MCP en npm/GitHub, autoinstalar servidores en `.agents/mcp/mcp-servers.json` y declarar variables en `.env` (ej. Google Calendar MCP).
+- **Visualizador de Pensamientos ReAct en la UI:** Renderizado de tarjetas de razonamiento y acciones (*"⚡ Razonamiento Autónomo ReAct"*) en los mensajes de Aura.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-007`, diagrama `SEQ-005`, decisión `ADR-0006` y contratos `TASK-008` / `TASK-009`.
+
+---
+
 ## [0.5.0] - 2026-09-01
 
 ### Added
 - **Sidebar de Historial de Conversaciones (ChatGPT / Claude UI):** Panel lateral retráctil con lista de chats guardados, botón `+ Nueva Conversación` y persistencia automática en `localStorage`.
 - **Botón de Copiado Rápido (📋):** Icono de copiado en cada burbuja de mensaje con feedback interactivo (`✓ ¡Copiado!`).
-- **Autoconocimiento del Sistema & Scaffolding de MCPs:** Aura ahora asume el rol de ingeniera de software proactiva que comprende su arquitectura hexagonal y guía paso a paso la integración de servidores MCP (ej. Google Calendar), dejando al usuario únicamente la configuración de credenciales en `.env`.
-- **Memoria Conversacional Multi-Turno:** El servidor `web_server.py` mantiene y alimenta el contexto completo de las sesiones activas a Ollama.
-- **Gobernanza AI-SDLC:** Casos de uso `UC-006`, diagrama `SEQ-004`, decisión `ADR-0005`, y contratos `TASK-006` / `TASK-007`.
+- **Memoria Conversacional Multi-Turno:** El servidor mantiene el contexto de los mensajes de la sesión activa en Ollama.
 
 ---
 
