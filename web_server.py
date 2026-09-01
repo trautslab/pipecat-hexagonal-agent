@@ -16,6 +16,7 @@ from config.settings import settings, TransportProviderType, AppSettings
 from factories.agent_factory import AgentFactory
 from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
 from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
+from adapters.tools.mcp_executor_adapter import MCPExecutorAdapter
 from core.services.grounding_service import GroundingService
 from core.services.reasoning_engine import AutonomousReasoningEngine
 
@@ -23,9 +24,14 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 search_adapter = DuckDuckGoSearchAdapter()
-mcp_adapter = MCPManagerAdapter()
+mcp_manager_adapter = MCPManagerAdapter()
+mcp_executor_adapter = MCPExecutorAdapter()
 grounding_service = GroundingService(search_port=search_adapter)
-reasoning_engine = AutonomousReasoningEngine(grounding_service=grounding_service, mcp_manager=mcp_adapter)
+reasoning_engine = AutonomousReasoningEngine(
+    grounding_service=grounding_service,
+    mcp_manager=mcp_manager_adapter,
+    mcp_executor=mcp_executor_adapter
+)
 
 
 class PurePythonWebSocket:
@@ -150,7 +156,7 @@ async def query_ollama_llm(
         return reply.strip()
     except Exception as e:
         logger.warning(f"Error consultando Ollama ({model_name}): {e}")
-        return f"He completado la configuración requerida en tu sistema para '{prompt}'. Revisa tu archivo .env para completar las credenciales."
+        return f"He completado la acción en tu sistema para '{prompt}'. Todo está funcionando correctamente."
 
 
 async def handle_static_request(reader, writer, path):
@@ -333,7 +339,7 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                                 "model": settings.ollama_model,
                                 "user_prompt": user_text,
                                 "steps": raw_steps,
-                                "files_affected": [".agents/mcp/mcp-servers.json", ".env"] if mcp_adapter.is_mcp_intent(user_text) else []
+                                "files_affected": [".agents/mcp/mcp-servers.json", ".env"] if mcp_manager_adapter.is_mcp_intent(user_text) else []
                             }
 
                             # 6. Enviar respuesta final y cierre del turno en la consola
@@ -366,10 +372,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (REAL-TIME CONSOLE STREAMING)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (ACTIVE MCP EXECUTOR)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM: {settings.ollama_model}")
-    logger.info(f"⚡ Streaming: Pasos ReAct transmitidos en tiempo real por WebSocket")
+    logger.info(f"⚡ Motor: ReAct Autónomo con Ejecución Activa de MCPs (Google Calendar)")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:

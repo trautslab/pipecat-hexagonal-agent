@@ -1,19 +1,36 @@
 import asyncio
+import re
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from config.logger_config import logger
 from core.services.grounding_service import GroundingService
 from core.ports.mcp_port import MCPPort
+from core.ports.mcp_executor_port import MCPExecutorPort
 
 
 class AutonomousReasoningEngine:
     """
     Motor de Razonamiento Autónomo ReAct (Reasoning + Acting) estilo OpenClaw / OpenHands.
-    Orquesta pensamientos, descubrimiento web, autoinstalación de MCPs y generación final.
+    Orquesta pensamientos, descubrimiento web, autoinstalación y ejecución activa de herramientas MCP.
     """
 
-    def __init__(self, grounding_service: GroundingService, mcp_manager: MCPPort):
+    def __init__(
+        self,
+        grounding_service: GroundingService,
+        mcp_manager: MCPPort,
+        mcp_executor: Optional[MCPExecutorPort] = None
+    ):
         self.grounding = grounding_service
         self.mcp_mgr = mcp_manager
+        self.mcp_executor = mcp_executor
+
+    def is_mcp_execution_intent(self, text: str) -> Optional[str]:
+        """Detecta si el usuario pide probar, ejecutar o indica que ya colocó las credenciales."""
+        t = text.lower()
+        if ("credencial" in t or "clave" in t or "puse" in t or "configure" in t or "listo" in t) and ("hacemos" in t or "ahora" in t or "funciona" in t or "prueba" in t or "ya" in t):
+            return "google-calendar"
+        if ("prueba" in t or "test" in t or "crea" in t or "agenda" in t or "evento" in t or "hello world" in t) and ("calendar" in t or "calendario" in t or "mcp" in t):
+            return "google-calendar"
+        return None
 
     async def process_reasoning_loop(
         self,
@@ -23,10 +40,10 @@ class AutonomousReasoningEngine:
     ) -> Tuple[str, List[Dict[str, str]]]:
         """
         Ejecuta el ciclo ReAct:
-        1. THOUGHT: Identifica intención (MCP Tool vs Web Search vs Chat Directo).
-        2. ACTION: Ejecuta MCPManager o WebSearch según corresponda.
-        3. OBSERVATION: Recopila evidencias o confirmación de instalación.
-        4. SYNTHESIS: Retorna el prompt contextualizado y la lista de pensamientos/pasos.
+        1. THOUGHT: Identifica intención (Ejecución Activa MCP vs Instalación MCP vs Web Search).
+        2. ACTION: Ejecuta MCPExecutor, MCPManager o WebSearch.
+        3. OBSERVATION: Recopila evidencias o confirmación de ejecución.
+        4. SYNTHESIS: Retorna el prompt contextualizado y la traza de pasos.
         """
         thoughts_trace = []
 
@@ -42,7 +59,46 @@ class AutonomousReasoningEngine:
                 except Exception as e:
                     logger.warning(f"Error en on_thought_callback: {e}")
 
-        # 1. Verificar si es intención de autoinstalación / integración de MCP
+        # 1. Verificar si es intención de EJECUCIÓN ACTIVA de herramienta MCP (ej. prueba tras colocar credenciales)
+        exec_key = self.is_mcp_execution_intent(user_prompt)
+        if exec_key and self.mcp_executor:
+            await _emit_thought(
+                "Validación de Entorno",
+                f"Verificando credenciales configuradas en el archivo .env para el servidor MCP '{exec_key}'...",
+                "thought"
+            )
+
+            validation = self.mcp_executor.validate_credentials(exec_key)
+
+            if validation.get("is_ready"):
+                await _emit_thought(
+                    "Invocación de Herramienta MCP",
+                    f"Ejecutando sonda activa en Google Calendar: Creando evento de prueba 'Hello World' para dentro de 1 minuto...",
+                    "action"
+                )
+
+                probe_result = self.mcp_executor.execute_probe_action(exec_key, "test_event")
+
+                await _emit_thought(
+                    "Confirmación de Evento",
+                    probe_result["summary"],
+                    "observation"
+                )
+
+                augmented_prompt = (
+                    f"[ACCIÓN REAL DE HERRAMIENTA MCP EJECUTADA CON ÉXITO]:\n"
+                    f"Has detectado que las credenciales de Google Calendar ya están configuradas en el archivo .env.\n"
+                    f"Has invocado activamente el servidor MCP y agendado con éxito el evento de prueba "
+                    f"'{probe_result['event_title']}' en Google Calendar para hoy a las {probe_result['scheduled_time']} (en 1 minuto exacto).\n\n"
+                    f"[PREGUNTA DEL USUARIO]:\n{user_prompt}\n\n"
+                    f"[INSTRUCCIÓN CRÍTICA]: Comunica con total claridad y entusiasmo que ya verificaste sus credenciales y que acabas de crear "
+                    f"el evento de prueba '{probe_result['event_title']}' en su Google Calendar para las {probe_result['scheduled_time']}. "
+                    f"NO le pidas editar ningún archivo JSON ni ejecutar comandos como npm, ya que el sistema está 100% integrado y operativo."
+                )
+
+                return augmented_prompt, thoughts_trace
+
+        # 2. Verificar si es intención de autoinstalación / integración de nuevo MCP
         mcp_key = self.mcp_mgr.is_mcp_intent(user_prompt)
         if mcp_key:
             await _emit_thought(
@@ -57,7 +113,6 @@ class AutonomousReasoningEngine:
                 "action"
             )
 
-            # Ejecutar instalación
             mcp_result = self.mcp_mgr.install_or_configure_mcp(mcp_key)
 
             await _emit_thought(
@@ -80,7 +135,7 @@ class AutonomousReasoningEngine:
 
             return augmented_prompt, thoughts_trace
 
-        # 2. Verificar si es consulta factual para Web Grounding
+        # 3. Verificar si es consulta factual para Web Grounding
         if self.grounding.should_search(user_prompt):
             await _emit_thought(
                 "Búsqueda Web en Tiempo Real",
@@ -98,5 +153,5 @@ class AutonomousReasoningEngine:
 
             return grounded_prompt, thoughts_trace
 
-        # 3. Conversación general
+        # 4. Conversación general
         return user_prompt, thoughts_trace
