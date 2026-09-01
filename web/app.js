@@ -1,7 +1,7 @@
 /**
- * Aura Voice AI - Web Client v0.3.0
- * Soporte para Reconocimiento de Voz nativo (Web Speech API), AudioContext Canvas Visualizer,
- * Síntesis de voz en español y streaming WebSocket bidireccional con Ollama.
+ * Aura Voice AI - Web Client v0.5.0
+ * Soporte para Historial de Conversaciones Persistente (ChatGPT/Claude UI),
+ * Botón de Copiado Inteligente, AudioContext Canvas Visualizer y Streaming WebSocket.
  */
 
 class VoiceAgentApp {
@@ -16,9 +16,19 @@ class VoiceAgentApp {
     this.isConnected = false;
     this.isSpeaking = false;
 
+    // Sessions & Chat State
+    this.sessions = [];
+    this.currentSessionId = null;
+
     // DOM Elements
     this.themeToggleBtn = document.getElementById("theme-toggle-btn");
     this.themeIcon = document.getElementById("theme-icon");
+    this.toggleSidebarBtn = document.getElementById("toggle-sidebar-btn");
+    this.sidebar = document.getElementById("sidebar");
+    this.newChatBtn = document.getElementById("new-chat-btn");
+    this.historyList = document.getElementById("history-list");
+    this.currentChatTitle = document.getElementById("current-chat-title");
+
     this.toggleMicBtn = document.getElementById("toggle-mic-btn");
     this.btnText = document.getElementById("btn-text");
     this.statusBadge = document.getElementById("status-badge");
@@ -33,9 +43,9 @@ class VoiceAgentApp {
     this.animationId = null;
     this.dataArray = null;
     this.phase = 0;
-    this.lastTranscriptionTime = 0;
 
     this.initTheme();
+    this.initSessions();
     this.initEvents();
     this.resizeCanvas();
     this.startIdleAnimation();
@@ -62,9 +72,200 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     2. EVENT LISTENERS & RESIZE
+     2. SESSIONS & CHAT PERSISTENCE (ChatGPT / Claude Style)
+     ============================================================================ */
+  initSessions() {
+    const rawSessions = localStorage.getItem("aura_conversations");
+    if (rawSessions) {
+      try {
+        this.sessions = JSON.parse(rawSessions);
+      } catch (e) {
+        this.sessions = [];
+      }
+    }
+
+    if (this.sessions.length === 0) {
+      this.createNewSession(false);
+    } else {
+      const lastSessionId = localStorage.getItem("aura_active_session") || this.sessions[0].id;
+      const found = this.sessions.find(s => s.id === lastSessionId);
+      this.selectSession(found ? found.id : this.sessions[0].id);
+    }
+  }
+
+  saveSessions() {
+    localStorage.setItem("aura_conversations", JSON.stringify(this.sessions));
+    localStorage.setItem("aura_active_session", this.currentSessionId);
+    this.renderSidebarHistory();
+  }
+
+  createNewSession(render = true) {
+    const newId = "session_" + Date.now();
+    const newSession = {
+      id: newId,
+      title: "Nueva Conversación",
+      createdAt: new Date().toISOString(),
+      messages: [
+        {
+          role: "bot",
+          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. ¿En qué puedo colaborar o qué herramienta deseas configurar hoy?",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    };
+
+    this.sessions.unshift(newSession);
+    this.currentSessionId = newId;
+    this.saveSessions();
+
+    if (render) {
+      this.selectSession(newId);
+    }
+  }
+
+  selectSession(sessionId) {
+    const session = this.sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    this.currentSessionId = sessionId;
+    this.currentChatTitle.textContent = session.title;
+    localStorage.setItem("aura_active_session", sessionId);
+
+    // Renderizar mensajes de la sesión
+    this.captionsStream.innerHTML = "";
+    session.messages.forEach(m => {
+      this.renderMessageBubble(m.role, m.text, m.time, false);
+    });
+    this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
+
+    this.renderSidebarHistory();
+  }
+
+  deleteSession(sessionId, event) {
+    if (event) event.stopPropagation();
+    this.sessions = this.sessions.filter(s => s.id !== sessionId);
+
+    if (this.sessions.length === 0) {
+      this.createNewSession();
+    } else {
+      if (this.currentSessionId === sessionId) {
+        this.selectSession(this.sessions[0].id);
+      } else {
+        this.saveSessions();
+      }
+    }
+  }
+
+  renderSidebarHistory() {
+    this.historyList.innerHTML = "";
+
+    this.sessions.forEach(session => {
+      const item = document.createElement("div");
+      item.className = `history-item ${session.id === this.currentSessionId ? "active" : ""}`;
+      item.onclick = () => this.selectSession(session.id);
+
+      item.innerHTML = `
+        <span class="history-title" title="${session.title}">${session.title}</span>
+        <button class="history-delete-btn" title="Eliminar conversación" aria-label="Eliminar">🗑️</button>
+      `;
+
+      const delBtn = item.querySelector(".history-delete-btn");
+      delBtn.onclick = (e) => this.deleteSession(session.id, e);
+
+      this.historyList.appendChild(item);
+    });
+  }
+
+  addMessageToCurrentSession(role, text) {
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    if (!session) return;
+
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    session.messages.push({ role, text, time });
+
+    // Auto-generar título si es la primera pregunta del usuario
+    if (role === "user" && (session.title === "Nueva Conversación" || session.title.startsWith("Conversación"))) {
+      session.title = text.length > 28 ? text.substring(0, 28) + "..." : text;
+      this.currentChatTitle.textContent = session.title;
+    }
+
+    this.saveSessions();
+    this.renderMessageBubble(role, text, time, true);
+  }
+
+  /* ============================================================================
+     3. RENDER MESSAGE BUBBLE WITH COPY BUTTON
+     ============================================================================ */
+  renderMessageBubble(role, text, time, autoScroll = true) {
+    const bubble = document.createElement("div");
+    bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
+
+    bubble.innerHTML = `
+      <div class="bubble-header">
+        <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
+        <div class="bubble-actions">
+          <span class="bubble-time">${time || "Ahora"}</span>
+          <button class="copy-msg-btn" title="Copiar mensaje">
+            <span>📋</span> Copiar
+          </button>
+        </div>
+      </div>
+      <div class="bubble-text">${this.formatText(text)}</div>
+    `;
+
+    const copyBtn = bubble.querySelector(".copy-msg-btn");
+    copyBtn.onclick = () => this.copyToClipboard(text, copyBtn);
+
+    this.captionsStream.appendChild(bubble);
+    if (autoScroll) {
+      this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
+    }
+  }
+
+  formatText(text) {
+    // Si contiene bloques de código o comandos
+    return text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+  }
+
+  async copyToClipboard(text, btnElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btnElement.classList.add("copied");
+      btnElement.innerHTML = "<span>✓</span> ¡Copiado!";
+      setTimeout(() => {
+        btnElement.classList.remove("copied");
+        btnElement.innerHTML = "<span>📋</span> Copiar";
+      }, 2000);
+    } catch (e) {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+
+      btnElement.classList.add("copied");
+      btnElement.innerHTML = "<span>✓</span> ¡Copiado!";
+      setTimeout(() => {
+        btnElement.classList.remove("copied");
+        btnElement.innerHTML = "<span>📋</span> Copiar";
+      }, 2000);
+    }
+  }
+
+  /* ============================================================================
+     4. EVENT LISTENERS
      ============================================================================ */
   initEvents() {
+    this.toggleSidebarBtn.addEventListener("click", () => {
+      this.sidebar.classList.toggle("collapsed");
+    });
+
+    this.newChatBtn.addEventListener("click", () => {
+      this.createNewSession();
+    });
+
     this.toggleMicBtn.addEventListener("click", () => {
       if (!this.isConnected) {
         this.startSession();
@@ -76,6 +277,11 @@ class VoiceAgentApp {
     this.audioTestBtn.addEventListener("click", () => this.playAudioTest());
     
     this.clearCaptionsBtn.addEventListener("click", () => {
+      const session = this.sessions.find(s => s.id === this.currentSessionId);
+      if (session) {
+        session.messages = [];
+        this.saveSessions();
+      }
       this.captionsStream.innerHTML = "";
     });
 
@@ -93,38 +299,22 @@ class VoiceAgentApp {
     this.statusText.textContent = label.toUpperCase();
   }
 
-  addCaption(role, text) {
-    const bubble = document.createElement("div");
-    bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
-
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    bubble.innerHTML = `
-      <div class="bubble-header">
-        <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
-        <span class="bubble-time">${now}</span>
-      </div>
-      <p class="bubble-text">${text}</p>
-    `;
-
-    this.captionsStream.appendChild(bubble);
-    this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
-  }
-
   /* ============================================================================
-     3. SPEECH SYNTHESIS (Voz del Asistente)
+     5. SPEECH SYNTHESIS & RECOGNITION
      ============================================================================ */
   speakText(text) {
     if (!('speechSynthesis' in window)) return;
     
-    window.speechSynthesis.cancel(); // Cancelar locuciones previas
+    window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Limpiar posibles bloques de código de la locución hablada
+    const cleanSpokenText = text.replace(/```[\s\S]*?```/g, ' Código adjunto en pantalla. ');
+
+    const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
     utterance.lang = "es-ES";
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
 
-    // Buscar una voz en español natural si está disponible
     const voices = window.speechSynthesis.getVoices();
     const esVoice = voices.find(v => v.lang.startsWith("es") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Paulina") || v.name.includes("Mónica") || v.name.includes("Jorge")));
     if (esVoice) {
@@ -153,9 +343,6 @@ class VoiceAgentApp {
     window.speechSynthesis.speak(utterance);
   }
 
-  /* ============================================================================
-     4. AUDIO SESSION & WEBSOCKET
-     ============================================================================ */
   async startSession() {
     try {
       this.setStatus("listening", "Conectando...");
@@ -164,7 +351,6 @@ class VoiceAgentApp {
         await this.audioContext.resume();
       }
 
-      // 1. Obtener micrófono
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -182,20 +368,15 @@ class VoiceAgentApp {
 
       this.audioInput.connect(this.analyser);
 
-      // 2. Procesador PCM de audio (para streaming de audio puro)
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
       this.processor.onaudioprocess = (e) => this.handleAudioInput(e);
 
       this.audioInput.connect(this.processor);
       this.processor.connect(this.audioContext.destination);
 
-      // 3. Inicializar Reconocimiento de Voz del Navegador (SpeechRecognition)
       this.initSpeechRecognition();
-
-      // 4. Conectar WebSocket con backend
       this.connectWebSocket();
 
-      // UI
       this.isConnected = true;
       this.toggleMicBtn.className = "cta-button active";
       this.btnText.textContent = "DETENER CONVERSACIÓN";
@@ -213,10 +394,7 @@ class VoiceAgentApp {
 
   initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn("SpeechRecognition no soportado en este navegador.");
-      return;
-    }
+    if (!SpeechRecognition) return;
 
     this.recognition = new SpeechRecognition();
     this.recognition.lang = "es-ES";
@@ -230,12 +408,15 @@ class VoiceAgentApp {
       
       if (transcript.length > 0) {
         console.log("🗣️ Transcripción detectada:", transcript);
-        this.addCaption("user", transcript);
+        this.addMessageToCurrentSession("user", transcript);
 
-        // Enviar texto reconocido por WebSocket al backend para inferencia con Ollama
+        // Enviar con contexto de sesión
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          const session = this.sessions.find(s => s.id === this.currentSessionId);
           this.socket.send(JSON.stringify({
             type: "user_transcription",
+            sessionId: this.currentSessionId,
+            history: session ? session.messages.slice(-6) : [],
             text: transcript
           }));
         }
@@ -247,7 +428,6 @@ class VoiceAgentApp {
     };
 
     this.recognition.onend = () => {
-      // Reiniciar reconocimiento si la sesión sigue activa
       if (this.isConnected && this.recognition) {
         try {
           this.recognition.start();
@@ -257,9 +437,7 @@ class VoiceAgentApp {
 
     try {
       this.recognition.start();
-    } catch (e) {
-      console.warn("No se pudo iniciar SpeechRecognition:", e);
-    }
+    } catch (e) {}
   }
 
   connectWebSocket() {
@@ -271,7 +449,7 @@ class VoiceAgentApp {
     this.socket.binaryType = "arraybuffer";
 
     this.socket.onopen = () => {
-      console.log("✅ WebSocket conectado a Aura Voice Agent.");
+      console.log("✅ WebSocket conectado.");
       this.setStatus("connected", "Escuchando");
     };
 
@@ -281,9 +459,11 @@ class VoiceAgentApp {
           const msg = JSON.parse(event.data);
           
           if (msg.type === "caption") {
-            this.addCaption(msg.role || "bot", msg.text);
-            if (msg.speak) {
-              this.speakText(msg.text);
+            if (msg.text) {
+              this.addMessageToCurrentSession(msg.role || "bot", msg.text);
+              if (msg.speak) {
+                this.speakText(msg.text);
+              }
             }
           } else if (msg.type === "status") {
             if (msg.state === "thinking") {
@@ -303,12 +483,7 @@ class VoiceAgentApp {
       }
     };
 
-    this.socket.onerror = (err) => {
-      console.warn("WebSocket error:", err);
-    };
-
     this.socket.onclose = () => {
-      console.log("WebSocket cerrado.");
       if (this.isConnected) {
         this.setStatus("disconnected", "Desconectado");
       }
@@ -357,8 +532,9 @@ class VoiceAgentApp {
   }
 
   playAudioTest() {
-    this.speakText("¡Hola! La salida de audio de tus altavoces está funcionando perfectamente.");
-    this.addCaption("bot", "🔊 Prueba de audio de altavoces ejecutada correctamente.");
+    const text = "¡Hola! La salida de audio de tus altavoces está funcionando perfectamente.";
+    this.speakText(text);
+    this.addMessageToCurrentSession("bot", "🔊 " + text);
   }
 
   stopSession() {
@@ -391,7 +567,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     5. WAVEFORM VISUALIZER RENDERING (Canvas)
+     6. CANVAS WAVEFORM ANIMATION
      ============================================================================ */
   startActiveWaveform() {
     cancelAnimationFrame(this.animationId);
@@ -405,7 +581,6 @@ class VoiceAgentApp {
       const height = this.canvas.height;
       this.canvasCtx.clearRect(0, 0, width, height);
 
-      // Colores según tema
       const style = getComputedStyle(document.documentElement);
       const colorStart = style.getPropertyValue("--waveform-gradient-start").trim() || "#6366f1";
       const colorMid = style.getPropertyValue("--waveform-gradient-mid").trim() || "#06b6d4";
@@ -416,7 +591,6 @@ class VoiceAgentApp {
       gradient.addColorStop(0.5, colorMid);
       gradient.addColorStop(1, colorEnd);
 
-      // 1. Barras de Frecuencia
       const barCount = 48;
       const barWidth = (width / barCount) * 0.7;
       const step = Math.floor(this.dataArray.length / barCount);
@@ -435,7 +609,6 @@ class VoiceAgentApp {
         this.canvasCtx.fill();
       }
 
-      // 2. Onda Suave Continua (Sine Wave Overlay)
       this.phase += 0.05;
       this.canvasCtx.beginPath();
       this.canvasCtx.strokeStyle = colorStart;
