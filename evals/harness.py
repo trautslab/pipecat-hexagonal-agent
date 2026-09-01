@@ -338,14 +338,12 @@ def eval_task_014_server_side_persistence() -> bool:
             "consoleLogs": [{"turnIndex": 1, "steps": [{"title": "Test", "detail": "Detalle"}]}]
         }
 
-        # Guardar y recuperar
         assert repo.save_session(test_session) is True
         loaded = repo.get_session("eval_test_session_1")
         assert loaded is not None
         assert loaded["title"] == "Evaluación de Persistencia"
         assert len(loaded["consoleLogs"]) == 1
 
-        # Limpiar prueba
         repo.delete_session("eval_test_session_1")
         assert repo.get_session("eval_test_session_1") is None
 
@@ -356,9 +354,36 @@ def eval_task_014_server_side_persistence() -> bool:
         return False
 
 
+def eval_task_015_ide_workbench_layout() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-015: Layout Postman / Modern IDE Workbench (5 Zonas)...")
+    try:
+        web_index = (ROOT_DIR / "web" / "index.html").read_text()
+        web_styles = (ROOT_DIR / "web" / "styles.css").read_text()
+        web_app = (ROOT_DIR / "web" / "app.js").read_text()
+
+        # Validar las 5 zonas
+        assert "ide-header" in web_index, "ide-header no encontrado"
+        assert "ide-sidebar" in web_index, "ide-sidebar no encontrado"
+        assert "ide-workbench" in web_index, "ide-workbench no encontrado"
+        assert "ide-right-sidebar" in web_index, "ide-right-sidebar no encontrado"
+        assert "ide-footer" in web_index, "ide-footer no encontrado"
+
+        # Validar pestañas y elementos clave del workbench
+        assert "workbench-tabs-bar" in web_index, "workbench-tabs-bar no encontrado"
+        assert "waveform-canvas" in web_index, "waveform-canvas no encontrado"
+        assert "captions-stream" in web_index, "captions-stream no encontrado"
+        assert "ide-container" in web_styles, "ide-container no encontrado en CSS"
+
+        print("✅ [EVAL TASK-015] Superada: Maquetación Postman/IDE Workbench de 5 zonas validada exitosamente.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-015] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-014)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-015)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -379,7 +404,8 @@ def main():
         ("TASK-011", eval_task_011_realtime_console_right_sidebar),
         ("TASK-012", eval_task_012_mcp_active_executor),
         ("TASK-013", eval_task_013_mcp_autonomous_runtime),
-        ("TASK-014", eval_task_014_server_side_persistence)
+        ("TASK-014", eval_task_014_server_side_persistence),
+        ("TASK-015", eval_task_015_ide_workbench_layout)
     ]
 
     for task_id, fn in tasks:
