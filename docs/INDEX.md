@@ -22,6 +22,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0012`: Rediseño de Interfaz a Layout Postman / Modern IDE Workbench](adr/ADR-0012-postman-ide-workbench-ui.md)
   - [`ADR-0013`: Despachador Parametrizado de Herramientas y Barrera Anti-Rechazo](adr/ADR-0013-parameterized-tool-dispatch-and-anti-refusal-guard.md)
   - [`ADR-0014`: Cliente Nativo de Google Calendar API v3 y OAuth2](adr/ADR-0014-google-calendar-api-v3-oauth2-client.md)
+  - [`ADR-0015`: Extracción de Metadatos de Calendario y Descripciones Amables](adr/ADR-0015-nlp-calendar-metadata-and-description-generation.md)
 
 ---
 
@@ -44,6 +45,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-013`](use-cases/UC-013-ide-workbench-layout.md) | Layout IDE Workbench (Postman Style) | UI/UX Layout | [`SEQ-011`](diagrams/sequences/SEQ-011-ide-workbench-interaction.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-015`](../.agents/tasks/TASK-015-ide-workbench-layout.md) | `APPROVED` |
 | [`UC-014`](use-cases/UC-014-zero-refusal-autonomous-tool-dispatch.md) | Despacho Parametrizado & Anti-Rechazo | Tool Dispatch | [`SEQ-012`](diagrams/sequences/SEQ-012-parameterized-mcp-tool-dispatch.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-016`](../.agents/tasks/TASK-016-parameterized-autonomous-tool-dispatch.md) | `APPROVED` |
 | [`UC-015`](use-cases/UC-015-real-google-calendar-api-integration.md) | Integración Real Google Calendar API v3 | Google APIs | [`SEQ-013`](diagrams/sequences/SEQ-013-real-google-oauth-and-event-insertion.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-017`](../.agents/tasks/TASK-017-real-google-calendar-api.md) | `APPROVED` |
+| [`UC-016`](use-cases/UC-016-natural-language-event-extraction.md) | Extracción NLP y Descripciones Amables | NLP Parser | [`SEQ-014`](diagrams/sequences/SEQ-014-nlp-calendar-parameter-extraction.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-018`](../.agents/tasks/TASK-018-natural-language-calendar-extraction.md) | `APPROVED` |
 
 ---
 
@@ -63,6 +65,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 - [`SEQ-011`](diagrams/sequences/SEQ-011-ide-workbench-interaction.md) — Flujo de interacción en layout Postman/IDE Workbench.
 - [`SEQ-012`](diagrams/sequences/SEQ-012-parameterized-mcp-tool-dispatch.md) — Despacho de herramientas parametrizadas y barrera anti-rechazo.
 - [`SEQ-013`](diagrams/sequences/SEQ-013-real-google-oauth-and-event-insertion.md) — Flujo OAuth2 e inserción real en Google Calendar API v3.
+- [`SEQ-014`](diagrams/sequences/SEQ-014-nlp-calendar-parameter-extraction.md) — Extracción NLP e inserción de eventos enriquecidos con recordatorio.
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
