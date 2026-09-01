@@ -59,13 +59,17 @@ class AutonomousReasoningEngine:
         """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
         t = text.lower()
         
+        # Si pide explícitamente instalar/integrar por primera vez, no ejecutar todavía
+        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:"]):
+            return None
+
         has_time = bool(re.search(r'\b\d{1,2}:\d{2}\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "4:09", "4:15"])
         has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu"])
 
         if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google"])):
             return "google-calendar"
             
-        if any(w in t for w in ["hello world", "google calendar", "sincronizar", "sincroniza", "sync-google-calendar"]):
+        if any(w in t for w in ["hello world", "sincronizar", "sincroniza", "sync-google-calendar"]):
             return "google-calendar"
 
         return None
