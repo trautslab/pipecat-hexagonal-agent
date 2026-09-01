@@ -31,21 +31,26 @@ class AutonomousReasoningEngine:
         """Extrae de forma robusta el título y la hora solicitada desde el texto libre."""
         t = text.lower()
         
-        # 1. Extraer hora (ej. '4:09', '16:09', '04:09')
+        # 1. Extraer hora (ej. '4:09', '4:15', '16:09', '04:09')
         time_match = re.search(r'\b(\d{1,2}:\d{2})\b', text)
         target_time = None
         if time_match:
             raw_time = time_match.group(1)
-            target_time = f"{raw_time} p.m." if int(raw_time.split(":")[0]) < 12 else raw_time
+            parts = raw_time.split(":")
+            h, m = int(parts[0]), parts[1]
+            if h < 12:
+                target_time = f"{raw_time} p.m."
+            else:
+                target_time = f"{raw_time}"
         elif "un minuto" in t or "1 minuto" in t:
             future = datetime.datetime.now() + datetime.timedelta(minutes=1)
             target_time = future.strftime("%H:%M:%S")
 
         # 2. Extraer título
-        title = "Hello World"
+        title = "Hello World - Prueba Aura Voice AI"
         if "hello world" in t:
             title = "Hello World - Prueba Aura Voice AI"
-        elif "evento" in t or "prueba" in t:
+        elif "prueba" in t or "evento" in t:
             title = "Prueba de Sincronización Aura"
 
         return title, target_time
@@ -54,16 +59,13 @@ class AutonomousReasoningEngine:
         """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
         t = text.lower()
         
-        # Raíces semánticas de prueba y configuración
-        has_config_or_review = any(w in t for w in ["configur", "revis", "puse", "coloqu", "listo", "ajust", "credencial", "clave", "token"])
-        has_action_or_test = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "sincroniz", "sync", "ejecut", "funciona"])
-        has_calendar_or_time = any(w in t for w in ["calendar", "calendario", "hora", "minuto", "mcp", "4:09", "16:09", "alas", "para las"])
+        has_time = bool(re.search(r'\b\d{1,2}:\d{2}\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "4:09", "4:15"])
+        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu"])
 
-        if has_config_or_review and (has_action_or_test or has_calendar_or_time):
+        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google"])):
             return "google-calendar"
-        if has_action_or_test and (has_calendar_or_time or "hello world" in t or "evento" in t):
-            return "google-calendar"
-        if "sincronizar" in t or "sincroniza" in t or "sync" in t:
+            
+        if any(w in t for w in ["hello world", "google calendar", "sincronizar", "sincroniza", "sync-google-calendar"]):
             return "google-calendar"
 
         return None
@@ -95,7 +97,7 @@ class AutonomousReasoningEngine:
                 except Exception as e:
                     logger.warning(f"Error en on_thought_callback: {e}")
 
-        # 1. Verificar si es intención de EJECUCIÓN PARAMETRIZADA O SINCRONIZACIÓN AUTÓNOMA
+        # 1. PRIORIDAD 1: Intención de EJECUCIÓN PARAMETRIZADA O SINCRONIZACIÓN AUTÓNOMA
         exec_key = self.is_mcp_execution_intent(user_prompt)
         if exec_key:
             title, target_time = self.parse_calendar_parameters(user_prompt)
@@ -103,7 +105,7 @@ class AutonomousReasoningEngine:
 
             await _emit_thought(
                 "Inspección de Parámetros y Entorno",
-                f"Detectada solicitud de prueba de '{exec_key}'. Parámetros extraídos: Título='{title}', Hora='{time_display}'. Verificando .env...",
+                f"Detectada solicitud de ejecución/prueba para '{exec_key}'. Parámetros extraídos: Título='{title}', Hora='{time_display}'. Verificando .env...",
                 "thought"
             )
 
@@ -144,7 +146,7 @@ class AutonomousReasoningEngine:
 
             return augmented_prompt, thoughts_trace
 
-        # 2. Verificar si es intención de autoinstalación / integración de nuevo MCP
+        # 2. PRIORIDAD 2: Intención de autoinstalación / integración de nuevo MCP
         mcp_key = self.mcp_mgr.is_mcp_intent(user_prompt)
         if mcp_key:
             await _emit_thought(
@@ -181,7 +183,7 @@ class AutonomousReasoningEngine:
 
             return augmented_prompt, thoughts_trace
 
-        # 3. Verificar si es consulta factual para Web Grounding
+        # 3. PRIORIDAD 3: Consulta factual para Web Grounding
         if self.grounding.should_search(user_prompt):
             await _emit_thought(
                 "Búsqueda Web en Tiempo Real",
