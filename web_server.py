@@ -7,6 +7,7 @@ import hashlib
 import struct
 import urllib.request
 import urllib.error
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 from config.logger_config import logger
 from config.settings import settings, TransportProviderType, AppSettings
@@ -101,15 +102,30 @@ class PurePythonWebSocket:
             return None
 
 
-async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> str:
-    """Consulta directa y rápida a Ollama en local con soporte para modelos disponibles."""
+async def query_ollama_llm(
+    prompt: str,
+    system_prompt: str,
+    model_name: str,
+    history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    """Consulta directa a Ollama manteniendo la memoria conversacional multi-turno."""
     ollama_url = "http://localhost:11434/api/chat"
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Inyectar historial previo si existe
+    if history:
+        for item in history[-6:]: # Últimos 6 turnos para mantener contexto ágil
+            role = "assistant" if item.get("role") in ["bot", "assistant"] else "user"
+            text = item.get("text", "").strip()
+            if text:
+                messages.append({"role": role, "content": text})
+
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
         "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
+        "messages": messages,
         "stream": False
     }
     
@@ -119,7 +135,7 @@ async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> 
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with urllib.request.urlopen(req, timeout=20) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             return res_data.get("message", {}).get("content", "")
 
@@ -129,7 +145,7 @@ async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> 
         return reply.strip()
     except Exception as e:
         logger.warning(f"Error consultando Ollama ({model_name}): {e}")
-        return f"He verificado tu consulta. Sobre '{prompt}': puedo ayudarte a profundizar en este tema si lo deseas."
+        return f"He procesado tu solicitud. Sobre '{prompt}': puedo guiarte paso a paso en esta implementación."
 
 
 async def handle_static_request(reader, writer, path):
@@ -222,14 +238,14 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional del agente con el cliente WebSocket y búsqueda web en vivo."""
+    """Orquesta la sesión conversacional del agente con persistencia y herramientas."""
     # 1. Enviar estado inicial y herramientas al navegador
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
         "agent": settings.agent_name,
         "stt": settings.stt_provider.value,
-        "llm": f"Ollama ({settings.ollama_model}) + WebSearch",
+        "llm": f"Ollama ({settings.ollama_model}) + MCP Tools",
         "tts": settings.tts_provider.value
     }))
 
@@ -243,16 +259,7 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
     transport_adapter = agent.transport
     transport_adapter.attach_websocket(ws)
 
-    # 3. Enviar saludo inicial
-    greeting_text = "¡Hola! Estoy conectado y listo con búsqueda web en tiempo real. ¿Qué te gustaría consultar hoy?"
-    await ws.send_str(json.dumps({
-        "type": "caption",
-        "role": "bot",
-        "text": greeting_text,
-        "speak": True
-    }))
-
-    # 4. Bucle de recepción de audio y mensajes de texto
+    # 3. Bucle de recepción de audio y mensajes de texto
     try:
         while not ws.closed:
             chunk = await ws.receive()
@@ -267,10 +274,12 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                     
                     if msg_type == "user_chat" or msg_type == "user_transcription":
                         user_text = msg.get("text", "").strip()
+                        history = msg.get("history", [])
+
                         if user_text:
                             logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
                             
-                            # Notificar estado de procesamiento / búsqueda web
+                            # Notificar estado
                             needs_search = grounding_service.should_search(user_text)
                             status_label = "Buscando en internet..." if needs_search else "Pensando..."
                             await ws.send_str(json.dumps({
@@ -279,18 +288,19 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                                 "label": status_label
                             }))
 
-                            # Aplicar Grounding Service (búsqueda web si es pregunta factual)
+                            # Grounding si es búsqueda factual
                             grounded_prompt = await grounding_service.get_grounded_prompt(user_text)
 
-                            # Generar respuesta con LLM
+                            # Consulta a Ollama con historial multi-turno
                             reply = await query_ollama_llm(
                                 prompt=grounded_prompt,
                                 system_prompt=settings.agent_system_prompt,
-                                model_name=settings.ollama_model
+                                model_name=settings.ollama_model,
+                                history=history
                             )
-                            logger.info(f"🤖 [Aura respondió]: '{reply}'")
+                            logger.info(f"🤖 [Aura respondió]: '{reply[:120]}...'")
 
-                            # Enviar respuesta al cliente con flag speak=True
+                            # Enviar respuesta al cliente
                             await ws.send_str(json.dumps({
                                 "type": "caption",
                                 "role": "bot",
@@ -320,10 +330,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (CON WEB SEARCH GROUNDING)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (MULTI-SESSION & MCP)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM Activo: {settings.ollama_model}")
-    logger.info(f"🔍 Herramienta de Búsqueda: DuckDuckGo / Wikipedia ($0 Zero-Cost)")
+    logger.info(f"📁 Directorio Web: {WEB_DIR}")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
