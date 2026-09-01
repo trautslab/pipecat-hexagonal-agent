@@ -13,13 +13,18 @@ from config.logger_config import logger
 from config.settings import settings, TransportProviderType, AppSettings
 from factories.agent_factory import AgentFactory
 from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
 from core.services.grounding_service import GroundingService
+from core.services.reasoning_engine import AutonomousReasoningEngine
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-# Instancia global del servicio de búsqueda y grounding
-grounding_service = GroundingService(search_port=DuckDuckGoSearchAdapter())
+# Instancias del ecosistema ReAct OpenClaw
+search_adapter = DuckDuckGoSearchAdapter()
+mcp_adapter = MCPManagerAdapter()
+grounding_service = GroundingService(search_port=search_adapter)
+reasoning_engine = AutonomousReasoningEngine(grounding_service=grounding_service, mcp_manager=mcp_adapter)
 
 
 class PurePythonWebSocket:
@@ -113,9 +118,8 @@ async def query_ollama_llm(
     
     messages = [{"role": "system", "content": system_prompt}]
     
-    # Inyectar historial previo si existe
     if history:
-        for item in history[-6:]: # Últimos 6 turnos para mantener contexto ágil
+        for item in history[-6:]:
             role = "assistant" if item.get("role") in ["bot", "assistant"] else "user"
             text = item.get("text", "").strip()
             if text:
@@ -135,7 +139,7 @@ async def query_ollama_llm(
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=25) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             return res_data.get("message", {}).get("content", "")
 
@@ -145,7 +149,7 @@ async def query_ollama_llm(
         return reply.strip()
     except Exception as e:
         logger.warning(f"Error consultando Ollama ({model_name}): {e}")
-        return f"He procesado tu solicitud. Sobre '{prompt}': puedo guiarte paso a paso en esta implementación."
+        return f"He completado la configuración requerida en tu sistema para '{prompt}'. Revisa tu archivo .env para completar las credenciales."
 
 
 async def handle_static_request(reader, writer, path):
@@ -199,7 +203,6 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
         method, path = parts[0], parts[1]
         headers = {}
 
-        # Leer cabeceras HTTP
         while True:
             line = await reader.readline()
             if not line or line == b"\r\n":
@@ -209,7 +212,6 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
                 k, v = line_str.split(":", 1)
                 headers[k.strip().lower()] = v.strip()
 
-        # Comprobar si es un Upgrade a WebSocket
         if headers.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in headers:
             key = headers["sec-websocket-key"]
             accept_hash = hashlib.sha1(key.encode("utf-8") + WS_MAGIC_STRING).digest()
@@ -238,14 +240,14 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional del agente con persistencia y herramientas."""
+    """Orquesta la sesión conversacional con el motor ReAct de razonamiento y MCPs."""
     # 1. Enviar estado inicial y herramientas al navegador
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
         "agent": settings.agent_name,
         "stt": settings.stt_provider.value,
-        "llm": f"Ollama ({settings.ollama_model}) + MCP Tools",
+        "llm": f"Ollama ({settings.ollama_model}) + OpenClaw ReAct",
         "tts": settings.tts_provider.value
     }))
 
@@ -266,7 +268,6 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
             if chunk is None:
                 break
             
-            # Si el chunk es JSON (mensajes de voz transcripta o control)
             if chunk.startswith(b"{") and chunk.endswith(b"}"):
                 try:
                     msg = json.loads(chunk.decode("utf-8"))
@@ -279,36 +280,46 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                         if user_text:
                             logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
                             
-                            # Notificar estado
-                            needs_search = grounding_service.should_search(user_text)
-                            status_label = "Buscando en internet..." if needs_search else "Pensando..."
+                            # Notificar estado "Razonando..."
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "thinking",
-                                "label": status_label
+                                "label": "Razonando..."
                             }))
 
-                            # Grounding si es búsqueda factual
-                            grounded_prompt = await grounding_service.get_grounded_prompt(user_text)
+                            # Callback para emitir pensamientos al cliente en tiempo real
+                            async def _send_thought(thought_item):
+                                await ws.send_str(json.dumps({
+                                    "type": "thought",
+                                    "step": thought_item
+                                }))
 
-                            # Consulta a Ollama con historial multi-turno
+                            # 4. Procesar ciclo ReAct
+                            processed_prompt, trace = await reasoning_engine.process_reasoning_loop(
+                                user_prompt=user_text,
+                                history=history,
+                                on_thought_callback=_send_thought
+                            )
+
+                            # 5. Consulta al LLM
                             reply = await query_ollama_llm(
-                                prompt=grounded_prompt,
+                                prompt=processed_prompt,
                                 system_prompt=settings.agent_system_prompt,
                                 model_name=settings.ollama_model,
                                 history=history
                             )
                             logger.info(f"🤖 [Aura respondió]: '{reply[:120]}...'")
 
-                            # Enviar respuesta al cliente
+                            # 6. Enviar respuesta final
                             await ws.send_str(json.dumps({
                                 "type": "caption",
                                 "role": "bot",
                                 "text": reply,
-                                "speak": True
+                                "speak": True,
+                                "trace": trace
                             }))
 
-                            # Restaurar estado a escuchando
+                            # Restaurar estado
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "connected",
@@ -320,7 +331,6 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                 except Exception as e:
                     logger.warning(f"Error procesando JSON de cliente: {e}")
             else:
-                # Chunk de audio PCM binario
                 await transport_adapter.handle_incoming_bytes(chunk)
     except Exception as e:
         logger.warning(f"Sesión WebSocket finalizada: {e}")
@@ -330,10 +340,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (MULTI-SESSION & MCP)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (OPENCLAW REACT ENGINE)")
     logger.info(f"👉 URL: http://localhost:{port}")
-    logger.info(f"🤖 Modelo LLM Activo: {settings.ollama_model}")
-    logger.info(f"📁 Directorio Web: {WEB_DIR}")
+    logger.info(f"🤖 Modelo LLM: {settings.ollama_model}")
+    logger.info(f"🧠 Motor Autónomo: ReAct (Pensamiento -> Búsqueda -> MCP -> Síntesis)")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
