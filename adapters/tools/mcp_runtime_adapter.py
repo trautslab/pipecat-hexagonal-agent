@@ -3,7 +3,7 @@ import json
 import re
 import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from config.logger_config import logger
 from core.ports.mcp_runtime_port import MCPRuntimePort
 from adapters.tools.google_calendar_client import GoogleCalendarClient
@@ -16,23 +16,13 @@ ENV_PATH = PROJECT_ROOT / ".env"
 class MCPRuntimeAdapter(MCPRuntimePort):
     """
     Adaptador de ejecución autónoma de subprocesos y herramientas MCP.
-    Ejecuta llamadas reales a APIs de Google Calendar y servidores MCP en segundo plano.
+    Ejecuta llamadas reales a APIs de Google Calendar (creación, listado, eliminación) y servidores MCP en segundo plano.
     """
 
     def __init__(self, mcp_file: Path = MCP_CONFIG_PATH, env_file: Path = ENV_PATH):
         self.mcp_file = mcp_file
         self.env_file = env_file
         self.gcal_client = GoogleCalendarClient(env_file=self.env_file)
-
-    def _load_env_vars(self) -> Dict[str, str]:
-        env_vars = {}
-        if self.env_file.exists():
-            for line in self.env_file.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    env_vars[k.strip()] = v.strip()
-        return env_vars
 
     def create_calendar_event(
         self,
@@ -54,6 +44,16 @@ class MCPRuntimeAdapter(MCPRuntimePort):
         )
         return result
 
+    def list_calendar_events(self, query: Optional[str] = None, max_results: int = 10) -> Dict[str, Any]:
+        """Consulta y lista los eventos existentes en Google Calendar."""
+        logger.info(f"⚡ [MCPRuntime] Listando eventos de Google Calendar API v3 (Query='{query}')...")
+        return self.gcal_client.list_real_events(query=query, max_results=max_results)
+
+    def delete_calendar_event(self, event_id: str) -> Dict[str, Any]:
+        """Elimina un evento real de Google Calendar."""
+        logger.info(f"⚡ [MCPRuntime] Eliminando evento {event_id} de Google Calendar API v3...")
+        return self.gcal_client.delete_real_event(event_id=event_id)
+
     def sync_google_calendar_now(self) -> Dict[str, Any]:
         """Ejecuta la sincronización real con Google Calendar y agenda evento 'Hello World'."""
         return self.create_calendar_event(title="Hello World - Sincronización Exitosa Aura Voice AI")
@@ -63,12 +63,17 @@ class MCPRuntimeAdapter(MCPRuntimePort):
         args = arguments or {}
 
         if server_key == "google-calendar":
-            title = args.get("title", "Hello World")
-            target_time = args.get("time")
-            date = args.get("date")
-            description = args.get("description")
-            location = args.get("location")
-            return self.create_calendar_event(title=title, target_time=target_time, date=date, description=description, location=location)
+            if tool_name in ["list_events", "get_events", "search_events"]:
+                return self.list_calendar_events(query=args.get("query"))
+            elif tool_name in ["delete_event", "remove_event"]:
+                return self.delete_calendar_event(event_id=args.get("event_id", ""))
+            else:
+                title = args.get("title", "Hello World")
+                target_time = args.get("time")
+                date = args.get("date")
+                description = args.get("description")
+                location = args.get("location")
+                return self.create_calendar_event(title=title, target_time=target_time, date=date, description=description, location=location)
 
         return {
             "status": "success",

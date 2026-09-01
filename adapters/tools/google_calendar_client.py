@@ -275,3 +275,77 @@ class GoogleCalendarClient:
         except Exception as e:
             logger.error(f"❌ [GoogleCalendarClient] Error de conexión con Google APIs: {e}")
             return {"status": "error", "error": str(e)}
+
+    def list_real_events(self, query: Optional[str] = None, max_results: int = 10) -> Dict[str, Any]:
+        """Consulta eventos reales de Google Calendar API v3."""
+        token = self.get_valid_access_token()
+        if not token:
+            return {
+                "status": "auth_required",
+                "auth_url": self.get_auth_url(),
+                "message": "Se requiere autorización de tu cuenta de Google."
+            }
+
+        api_url = f"https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults={max_results}"
+        if query:
+            api_url += f"&q={urllib.parse.quote(query)}"
+
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json"
+            }
+        )
+
+        try:
+            logger.info(f"🌐 [GoogleCalendarClient] Consultando eventos en Google Calendar: {api_url}...")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                items = data.get("items", [])
+                events_list = []
+                for item in items:
+                    start_val = item.get("start", {}).get("dateTime") or item.get("start", {}).get("date")
+                    events_list.append({
+                        "id": item.get("id"),
+                        "title": item.get("summary", "(Sin título)"),
+                        "start": start_val,
+                        "description": item.get("description", ""),
+                        "location": item.get("location", ""),
+                        "html_link": item.get("htmlLink", "")
+                    })
+                logger.info(f"📅 [GoogleCalendarClient] {len(events_list)} eventos recuperados de Google Calendar.")
+                return {
+                    "status": "success",
+                    "count": len(events_list),
+                    "events": events_list
+                }
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8")
+            logger.error(f"❌ [GoogleCalendarClient] Error de Google API al listar ({e.code}): {err_body}")
+            if e.code == 401:
+                return {"status": "auth_required", "auth_url": self.get_auth_url()}
+            return {"status": "error", "error": err_body}
+        except Exception as e:
+            logger.error(f"❌ [GoogleCalendarClient] Error listando eventos: {e}")
+            return {"status": "error", "error": str(e)}
+
+    def delete_real_event(self, event_id: str) -> Dict[str, Any]:
+        """Elimina un evento real de Google Calendar API v3."""
+        token = self.get_valid_access_token()
+        if not token:
+            return {"status": "auth_required", "auth_url": self.get_auth_url()}
+
+        api_url = f"https://www.googleapis.com/calendar/v3/calendars/primary/events/{event_id}"
+        req = urllib.request.Request(
+            api_url,
+            headers={"Authorization": f"Bearer {token}"},
+            method="DELETE"
+        )
+        try:
+            logger.info(f"🗑️ [GoogleCalendarClient] Eliminando evento {event_id}...")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return {"status": "success", "event_id": event_id, "message": "Evento eliminado correctamente."}
+        except Exception as e:
+            logger.error(f"❌ [GoogleCalendarClient] Error eliminando evento: {e}")
+            return {"status": "error", "error": str(e)}

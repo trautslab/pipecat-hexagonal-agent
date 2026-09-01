@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 class MCPRuntimePort(ABC):
@@ -27,4 +27,14 @@ class MCPRuntimePort(ABC):
         location: Optional[str] = None
     ) -> Dict[str, Any]:
         """Crea un evento de calendario con parámetros específicos de hora, título, fecha, descripción y ubicación."""
+        pass
+
+    @abstractmethod
+    def list_calendar_events(self, query: Optional[str] = None, max_results: int = 10) -> Dict[str, Any]:
+        """Consulta y lista los eventos existentes en Google Calendar."""
+        pass
+
+    @abstractmethod
+    def delete_calendar_event(self, event_id: str) -> Dict[str, Any]:
+        """Elimina un evento de Google Calendar."""
         pass

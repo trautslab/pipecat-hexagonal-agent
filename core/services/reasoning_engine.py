@@ -15,8 +15,8 @@ from core.ports.mcp_runtime_port import MCPRuntimePort
 class AutonomousReasoningEngine:
     """
     Motor de Razonamiento Autónomo ReAct (Reasoning + Acting) estilo OpenClaw / OpenHands.
-    Orquesta pensamientos, extracción semántica estructurada nativa del LLM (Tool Calling),
-    autoinstalación y ejecución activa de herramientas MCP con reglas de proactividad.
+    Orquesta clasificación estricta de intenciones (crear vs consultar vs eliminar vs conversar),
+    extracción estructurada y ejecución directa en Google Calendar API v3.
     """
 
     MONTHS = {
@@ -39,30 +39,79 @@ class AutonomousReasoningEngine:
         self.mcp_runtime = mcp_runtime
         self.ollama_model = ollama_model
 
+    def classify_calendar_intent(self, text: str) -> Optional[str]:
+        """
+        Clasifica con precisión la intención del usuario para evitar falsos positivos:
+        - 'list_events': Consultar, verificar, listar o auditar eventos existentes.
+        - 'create_event': Orden explícita e imperativa de creación de nuevo evento.
+        - 'delete_event': Orden de borrado de evento.
+        - None: No aplica acción de calendario.
+        """
+        t = text.lower()
+
+        # 1. Detección de Consulta / Verificación / Reclamo (PRIORIDAD ALTA)
+        query_triggers = [
+            "no veo", "estas seguro", "estás seguro", "seguro que", "revisa", "revisalo",
+            "qué eventos", "que eventos", "mis eventos", "mis citas", "tengo agendado",
+            "consultar", "listar", "lista", "busca el evento", "busca en el calendario",
+            "verifica", "verificar", "muestra los eventos", "qué hay en mi calendario",
+            "que hay en mi calendario", "cuándo es mi", "cuando es mi"
+        ]
+        if any(trig in t for trig in query_triggers):
+            return "list_events"
+
+        # 2. Detección de Eliminación
+        delete_triggers = ["elimina el evento", "borra el evento", "cancela el evento", "borra la cita", "eliminar evento"]
+        if any(trig in t for trig in delete_triggers):
+            return "delete_event"
+
+        # 3. Detección de Creación Explícita
+        creation_verbs = [
+            "crea", "créame", "creame", "agenda", "agéndame", "agendame", "programa",
+            "prográmame", "programame", "ponme", "pon un evento", "hazme un evento",
+            "haz un evento", "quiero que me hagas un evento", "quiero que me crees",
+            "agrega un evento", "añade un evento", "nuevo evento", "hello world", "sync-google-calendar"
+        ]
+        has_creation_verb = any(v in t for v in creation_verbs)
+        has_calendar_keyword = any(w in t for w in ["evento", "cita", "reunión", "reunion", "recordatorio", "calendar", "calendario", "cine"])
+        has_time_or_date = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["mañana", "hoy", "septiembre", "octubre", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto"])
+
+        if has_creation_verb and (has_calendar_keyword or has_time_or_date):
+            return "create_event"
+
+        return None
+
+    def is_mcp_execution_intent(self, text: str) -> Optional[str]:
+        """Compatibilidad con interfaz anterior."""
+        action = self.classify_calendar_intent(text)
+        if action in ["create_event", "list_events", "delete_event"]:
+            return "google-calendar"
+        return None
+
     async def llm_reason_and_extract_tool_call(self, user_prompt: str) -> Optional[Dict[str, Any]]:
-        """Invoca al LLM para razonar nativamente y emitir un Tool Call JSON con reglas de proactividad."""
+        """Invoca al LLM para razonar nativamente y emitir parámetros estructurados."""
         ollama_url = "http://localhost:11434/api/chat"
         now = datetime.datetime.now()
 
         system_instruction = (
             "Eres el Motor de Razonamiento ReAct de Aura Voice AI.\n"
             f"La fecha y hora actual del sistema es: {now.strftime('%Y-%m-%d %H:%M:%S')}.\n\n"
-            "Tu tarea es analizar la solicitud del usuario y emitir la llamada estructurada a la herramienta de Google Calendar aplicando PROACTIVIDAD Y MEJORES PRÁCTICAS.\n\n"
-            "Reglas de Excelencia y Proactividad:\n"
-            "1. Extrae el título exacto solicitado por el usuario (elimina muletillas como 'quiero que me hagas un evento').\n"
-            "2. Extrae o deduce la fecha en formato YYYY-MM-DD (asume el año actual o futuro correspondiente).\n"
-            "3. Extrae o deduce la hora en formato HH:MM:SS en 24 horas (ej. 5:15 pm -> 17:15:00).\n"
-            "4. Extrae la ubicación si fue mencionada en el contexto.\n"
-            "5. REDACTA UNA DESCRIPCIÓN PROACTIVA, AMABLE Y DETALLADA CON EMOJIS (ej. 🎬 Recordatorio, 📅 Fecha/Hora, 📍 Ubicación, ✨ Buenos deseos).\n\n"
-            "Responde ÚNICAMENTE con un bloque JSON válido:\n"
+            "Tu tarea es analizar la solicitud de creación de evento del usuario y emitir la llamada estructurada a Google Calendar aplicando PROACTIVIDAD Y MEJORES PRÁCTICAS.\n\n"
+            "Reglas de Excelencia:\n"
+            "1. Extrae el título exacto solicitado por el usuario (sin muletillas como 'quiero que me hagas un evento').\n"
+            "2. Extrae o deduce la fecha en formato YYYY-MM-DD.\n"
+            "3. Extrae o deduce la hora en formato HH:MM:SS en 24 horas.\n"
+            "4. Extrae la ubicación si fue mencionada.\n"
+            "5. REDACTA UNA DESCRIPCIÓN PROACTIVA, AMABLE Y DETALLADA CON EMOJIS.\n\n"
+            "Responde ÚNICAMENTE con un bloque JSON:\n"
             "{\n"
             '  "tool": "google_calendar.create_event",\n'
             '  "parameters": {\n'
-            '    "title": "Preparación para ir al cine Planet de 2 de mayo",\n'
-            '    "date": "2026-09-01",\n'
-            '    "time": "17:15:00",\n'
-            '    "location": "Cineplanet - 2 de Mayo",\n'
-            '    "description": "🎬 Recordatorio: Preparación para ir al cine Planet de 2 de mayo\\n📅 Fecha: 01/09/2026 a las 17:15 hrs\\n📍 Ubicación: Cineplanet - 2 de Mayo\\n\\n✨ Agendado automáticamente por Aura Voice AI. ¡Que disfrutes mucho de la película!"\n'
+            '    "title": "...",\n'
+            '    "date": "YYYY-MM-DD",\n'
+            '    "time": "HH:MM:SS",\n'
+            '    "location": "...",\n'
+            '    "description": "..."\n'
             "  }\n"
             "}"
         )
@@ -203,24 +252,6 @@ class AutonomousReasoningEngine:
             "description": friendly_description
         }
 
-    def is_mcp_execution_intent(self, text: str) -> Optional[str]:
-        """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
-        t = text.lower()
-        
-        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:", "5:", "17:", "10"]):
-            return None
-
-        has_time = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "mañana", "hoy", "pasado mañana", "septiembre", "octubre", "noviembre"])
-        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "agéndame", "agendame", "crea", "créame", "creame", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu", "llámalo", "llamalo", "reunión", "reunion", "cita"])
-
-        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google", "cine", "reunión", "reunion", "cita"])):
-            return "google-calendar"
-            
-        if any(w in t for w in ["hello world", "sincronizar", "sincroniza", "sync-google-calendar"]):
-            return "google-calendar"
-
-        return None
-
     async def process_reasoning_loop(
         self,
         user_prompt: str,
@@ -229,10 +260,10 @@ class AutonomousReasoningEngine:
     ) -> Tuple[str, List[Dict[str, str]]]:
         """
         Ejecuta el ciclo ReAct:
-        1. THOUGHT: Razonamiento Nativo del LLM para extraer parámetros estructurados y proactivos.
-        2. ACTION: Ejecuta Google Calendar API v3 o WebSearch en segundo plano.
-        3. OBSERVATION: Recopila confirmación de ejecución con enlaces oficiales.
-        4. SYNTHESIS: Retorna el prompt contextualizado y la traza de pasos.
+        1. THOUGHT: Clasificación estricta de intención (Consulta vs Creación vs Eliminación).
+        2. ACTION: Ejecución precisa de la herramienta correspondiente en segundo plano.
+        3. OBSERVATION: Recopilación de resultados reales desde Google Calendar API v3.
+        4. SYNTHESIS: Retorna prompt enriquecido y traza de pensamientos.
         """
         thoughts_trace = []
 
@@ -248,10 +279,62 @@ class AutonomousReasoningEngine:
                 except Exception as e:
                     logger.warning(f"Error en on_thought_callback: {e}")
 
-        # 1. PRIORIDAD 1: Intención de EJECUCIÓN PARAMETRIZADA O CREACIÓN DE EVENTO
-        exec_key = self.is_mcp_execution_intent(user_prompt)
-        if exec_key:
-            # A. Razonamiento Nativo del LLM (Tool Calling)
+        cal_action = self.classify_calendar_intent(user_prompt)
+
+        # 1. CASO A: CONSULTA / VERIFICACIÓN EN VIVO (list_events)
+        if cal_action == "list_events":
+            await _emit_thought(
+                "Consulta y Verificación en Vivo de Google Calendar",
+                "Detectada solicitud de verificación o búsqueda de eventos. Consultando Google Calendar API v3...",
+                "thought"
+            )
+
+            await _emit_thought(
+                "Ejecución de Consulta en Google Calendar API v3",
+                "Invocando google_calendar.list_real_events() para auditar el calendario del usuario...",
+                "action"
+            )
+
+            if self.mcp_runtime:
+                list_res = self.mcp_runtime.list_calendar_events()
+            else:
+                list_res = {"status": "success", "count": 0, "events": []}
+
+            if list_res.get("status") == "auth_required":
+                auth_url = list_res.get("auth_url", "http://localhost:8765/oauth2callback")
+                augmented_prompt = (
+                    f"[AUTORIZACIÓN REQUERIDA DE GOOGLE CALENDAR]:\n"
+                    f"Para consultar tus eventos en Google Calendar debes autorizar la cuenta aquí: {auth_url}\n\n"
+                    f"[PREGUNTA DEL USUARIO]:\n{user_prompt}"
+                )
+                return augmented_prompt, thoughts_trace
+
+            events = list_res.get("events", [])
+            await _emit_thought(
+                "Observación de Eventos en Google Calendar",
+                f"Consulta completada. Se encontraron {len(events)} eventos registrados en la cuenta de Google.",
+                "observation"
+            )
+
+            # Formatear lista de eventos
+            events_text = ""
+            for idx, ev in enumerate(events[:5], 1):
+                events_text += f"{idx}. **{ev.get('title')}** | Fecha/Hora: `{ev.get('start', 'N/A')}` | [Ver en Calendar]({ev.get('html_link')})\n"
+
+            augmented_prompt = (
+                f"[CONSULTA EN VIVO DE GOOGLE CALENDAR API v3 COMPLETADA]:\n"
+                f"Has consultado directamente la cuenta de Google Calendar del usuario y estos son los eventos reales encontrados ({len(events)} eventos):\n\n"
+                f"{events_text if events_text else 'No se encontraron eventos próximos registrados en el calendario.'}\n\n"
+                f"[PREGUNTA / DUDA DEL USUARIO]:\n{user_prompt}\n\n"
+                f"[INSTRUCCIÓN CRÍTICA]:\n"
+                f"1. Responde al usuario informándole con total claridad los eventos encontrados en su Google Calendar.\n"
+                f"2. Si el evento que busca no está en la lista, explícale cordialmente que puedes agendárselo de inmediato si lo confirma.\n"
+                f"3. NUNCA inventes eventos ni digas 'Lo siento'."
+            )
+            return augmented_prompt, thoughts_trace
+
+        # 2. CASO B: CREACIÓN EXPLÍCITA DE EVENTO (create_event)
+        elif cal_action == "create_event":
             llm_params = await self.llm_reason_and_extract_tool_call(user_prompt)
             if llm_params and llm_params.get("title"):
                 title = llm_params.get("title")
@@ -294,7 +377,7 @@ class AutonomousReasoningEngine:
                     location=location
                 )
             elif self.mcp_executor:
-                sync_res = self.mcp_executor.execute_probe_action(exec_key, "test_event")
+                sync_res = self.mcp_executor.execute_probe_action("google-calendar", "test_event")
             else:
                 sync_res = {
                     "status": "success",
@@ -306,21 +389,10 @@ class AutonomousReasoningEngine:
 
             if sync_res.get("status") == "auth_required":
                 auth_url = sync_res.get("auth_url", "http://localhost:8765/oauth2callback")
-                await _emit_thought(
-                    "Autorización OAuth2 Requerida",
-                    f"Credenciales de Google Cloud válidas. Se requiere el consentimiento del usuario para escribir en Google Calendar. URL generada: {auth_url}",
-                    "observation"
-                )
-
                 augmented_prompt = (
                     f"[AUTORIZACIÓN OAUTH2 REQUERIDA DE GOOGLE CLOUD]:\n"
-                    f"Las credenciales GOOGLE_CALENDAR_CLIENT_ID y CLIENT_SECRET en .env son válidas.\n"
-                    f"Para que Google permita insertar eventos en su calendario personal, el usuario debe autorizar el acceso una única vez haciendo clic en el siguiente enlace oficial:\n"
-                    f"{auth_url}\n\n"
-                    f"[SOLICITUD DEL USUARIO]:\n{user_prompt}\n\n"
-                    f"[INSTRUCCIÓN CRÍTICA]:\n"
-                    f"Indícale al usuario con entusiasmo que sus credenciales fueron reconocidas y que para completar la sincronización real con su Google Calendar solo debe hacer clic en el botón de autorización: {auth_url}. "
-                    f"Aclárale que tras autorizar, el evento '{title}' se creará automáticamente en su cuenta."
+                    f"Para que Google permita insertar eventos en su calendario personal, el usuario debe autorizar el acceso:\n{auth_url}\n\n"
+                    f"[SOLICITUD DEL USUARIO]:\n{user_prompt}"
                 )
                 return augmented_prompt, thoughts_trace
 
@@ -344,65 +416,29 @@ class AutonomousReasoningEngine:
                 f"[INSTRUCCIÓN CRÍTICA - ZERO REFUSAL]:\n"
                 f"1. Confirma con total seguridad y entusiasmo que el evento '{sync_res.get('event_title', title)}' ha sido creado físicamente en su Google Calendar para el {date_display} a las {time_display} con su recordatorio amable.\n"
                 f"2. {f'Incluye el enlace para ver el evento: {html_link}' if html_link else ''}\n"
-                f"3. ESTÁ ESTRICTAMENTE PROHIBIDO decir 'Lo siento' o inventar que se repetirá en el futuro si no fue configurado."
+                f"3. ESTÁ ESTRICTAMENTE PROHIBIDO inventar que se repetirá en el futuro si no fue configurado."
             )
 
             return augmented_prompt, thoughts_trace
 
-        # 2. PRIORIDAD 2: Intención de autoinstalación / integración de nuevo MCP
+        # 3. PRIORIDAD 2: Intención de autoinstalación / integración de nuevo MCP
         mcp_key = self.mcp_mgr.is_mcp_intent(user_prompt)
         if mcp_key:
-            await _emit_thought(
-                "Análisis de Intención",
-                f"El usuario solicita integrar la herramienta '{mcp_key}' en el sistema.",
-                "thought"
-            )
-
-            await _emit_thought(
-                "Descubrimiento y Configuración MCP",
-                f"Registrando servidor MCP en .agents/mcp/mcp-servers.json y declarando variables en .env...",
-                "action"
-            )
-
+            await _emit_thought("Análisis de Intención", f"El usuario solicita integrar la herramienta '{mcp_key}'.", "thought")
             mcp_result = self.mcp_mgr.install_or_configure_mcp(mcp_key)
-
-            await _emit_thought(
-                "Observación",
-                f"Servidor '{mcp_key}' configurado exitosamente. Variables preparadas: {', '.join(mcp_result['required_env_vars'])}",
-                "observation"
-            )
-
             vars_text = ", ".join(mcp_result["required_env_vars"])
             augmented_prompt = (
-                f"[ACCIÓN AUTÓNOMA DE SISTEMA COMPLETADA]:\n"
-                f"Has analizado tu propia arquitectura y registrado exitosamente el servidor MCP '{mcp_key}' "
-                f"({mcp_result['package']}) en el archivo .agents/mcp/mcp-servers.json.\n"
-                f"Además, has preparado y agregado automáticamente las variables de configuración en el archivo .env: {vars_text}.\n\n"
-                f"[PREGUNTA DEL USUARIO]:\n{user_prompt}\n\n"
-                f"[INSTRUCCIÓN CRÍTICA]: Comunica con seguridad y proactividad que el servidor MCP ya fue integrado en la arquitectura del sistema. "
-                f"Indícale al usuario exactamente qué variables ({vars_text}) debe completar con sus claves en su archivo .env para que la sincronización quede activa. "
-                f"Sé conciso, estructurado y profesional."
+                f"[ACCIÓN AUTÓNOMA DE SISTEMA COMPLETADA]: Servidor '{mcp_key}' registrado en .agents/mcp/mcp-servers.json. "
+                f"Variables requeridas: {vars_text}.\n[PREGUNTA]: {user_prompt}"
             )
-
             return augmented_prompt, thoughts_trace
 
-        # 3. PRIORIDAD 3: Consulta factual para Web Grounding
+        # 4. PRIORIDAD 3: Consulta factual para Web Grounding
         if self.grounding.should_search(user_prompt):
-            await _emit_thought(
-                "Búsqueda Web en Tiempo Real",
-                f"Consultando fuentes de internet para verificar información factual de: '{user_prompt}'",
-                "action"
-            )
-
+            await _emit_thought("Búsqueda Web en Tiempo Real", f"Consultando evidencias en internet para: '{user_prompt}'", "action")
             grounded_prompt = await self.grounding.get_grounded_prompt(user_prompt)
-
-            await _emit_thought(
-                "Evidencias Verificadas",
-                "Fragmentos recuperados con éxito desde la web. Inyectando contexto factual sin alucinaciones.",
-                "observation"
-            )
-
+            await _emit_thought("Evidencias Verificadas", "Fragmentos recuperados con éxito desde la web.", "observation")
             return grounded_prompt, thoughts_trace
 
-        # 4. Conversación general
+        # 5. Conversación general
         return user_prompt, thoughts_trace
