@@ -2,10 +2,25 @@
   "mcpServers": {
     "pipecat-agent-tools": {
       "command": "python3",
-      "args": ["scripts/mcp_server.py"],
+      "args": [
+        "scripts/mcp_server.py"
+      ],
       "env": {
         "PYTHONPATH": "."
       }
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-google-calendar"
+      ],
+      "env": {
+        "GOOGLE_CALENDAR_CLIENT_ID": "${GOOGLE_CALENDAR_CLIENT_ID}",
+        "GOOGLE_CALENDAR_CLIENT_SECRET": "${GOOGLE_CALENDAR_CLIENT_SECRET}",
+        "GOOGLE_CALENDAR_REDIRECT_URI": "${GOOGLE_CALENDAR_REDIRECT_URI}"
+      },
+      "description": "Servidor oficial de Google Calendar para crear, consultar y gestionar eventos y calendarios."
     }
   }
 }
