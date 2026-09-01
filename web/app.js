@@ -1,9 +1,9 @@
 /**
- * Aura Voice AI - Web Client
- * Captura de micrófono con Web Audio API, visualizador de ondas en Canvas y streaming WebSocket.
+ * Aura Voice AI - Web Client v0.3.0
+ * Soporte para Light/Dark Mode, visualizador de ondas reactivo en Canvas y streaming WebSocket.
  */
 
-class VoiceAgentWebClient {
+class VoiceAgentApp {
   constructor() {
     this.audioContext = null;
     this.mediaStream = null;
@@ -11,28 +11,58 @@ class VoiceAgentWebClient {
     this.processor = null;
     this.analyser = null;
     this.socket = null;
-    this.isPlaying = false;
     this.isConnected = false;
+    this.isSpeaking = false;
 
-    // Elementos DOM
-    this.toggleBtn = document.getElementById("toggle-mic-btn");
+    // DOM Elements
+    this.themeToggleBtn = document.getElementById("theme-toggle-btn");
+    this.themeIcon = document.getElementById("theme-icon");
+    this.toggleMicBtn = document.getElementById("toggle-mic-btn");
     this.btnText = document.getElementById("btn-text");
     this.statusBadge = document.getElementById("status-badge");
     this.statusText = document.getElementById("status-text");
     this.canvas = document.getElementById("waveform-canvas");
     this.canvasCtx = this.canvas.getContext("2d");
-    this.overlay = document.getElementById("visualizer-overlay");
-    this.captionsBox = document.getElementById("captions-box");
+    this.stageOverlay = document.getElementById("stage-overlay");
+    this.captionsStream = document.getElementById("captions-stream");
+    this.audioTestBtn = document.getElementById("audio-test-btn");
+    this.clearCaptionsBtn = document.getElementById("clear-captions-btn");
 
     this.animationId = null;
     this.dataArray = null;
+    this.phase = 0;
 
+    this.initTheme();
     this.initEvents();
-    this.drawIdleWaveform();
+    this.resizeCanvas();
+    this.startIdleAnimation();
   }
 
+  /* ============================================================================
+     1. THEME SWITCHER (Light / Dark Mode)
+     ============================================================================ */
+  initTheme() {
+    const savedTheme = localStorage.getItem("aura-theme") || "dark";
+    this.setTheme(savedTheme);
+
+    this.themeToggleBtn.addEventListener("click", () => {
+      const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+      const nextTheme = currentTheme === "dark" ? "light" : "dark";
+      this.setTheme(nextTheme);
+    });
+  }
+
+  setTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("aura-theme", theme);
+    this.themeIcon.textContent = theme === "dark" ? "🌙" : "☀️";
+  }
+
+  /* ============================================================================
+     2. EVENT LISTENERS & RESIZE
+     ============================================================================ */
   initEvents() {
-    this.toggleBtn.addEventListener("click", () => {
+    this.toggleMicBtn.addEventListener("click", () => {
       if (!this.isConnected) {
         this.startSession();
       } else {
@@ -40,8 +70,13 @@ class VoiceAgentWebClient {
       }
     });
 
+    this.audioTestBtn.addEventListener("click", () => this.playAudioTest());
+    
+    this.clearCaptionsBtn.addEventListener("click", () => {
+      this.captionsStream.innerHTML = "";
+    });
+
     window.addEventListener("resize", () => this.resizeCanvas());
-    this.resizeCanvas();
   }
 
   resizeCanvas() {
@@ -56,34 +91,42 @@ class VoiceAgentWebClient {
   }
 
   addCaption(role, text) {
-    const item = document.createElement("div");
-    item.className = `caption-item ${role === "bot" ? "bot-msg" : "user-msg"}`;
-    
-    const avatar = document.createElement("span");
-    avatar.className = "avatar";
-    avatar.textContent = role === "bot" ? "🤖 Aura:" : "👤 Tú:";
+    const bubble = document.createElement("div");
+    bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
 
-    const content = document.createElement("p");
-    content.textContent = text;
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    item.appendChild(avatar);
-    item.appendChild(content);
-    this.captionsBox.appendChild(item);
-    this.captionsBox.scrollTop = this.captionsBox.scrollHeight;
+    bubble.innerHTML = `
+      <div class="bubble-header">
+        <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
+        <span class="bubble-time">${now}</span>
+      </div>
+      <p class="bubble-text">${text}</p>
+    `;
+
+    this.captionsStream.appendChild(bubble);
+    this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
   }
 
+  /* ============================================================================
+     3. AUDIO SESSION & WEBSOCKET
+     ============================================================================ */
   async startSession() {
     try {
       this.setStatus("listening", "Conectando...");
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-      
-      // Solicitar micrófono
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+      }
+
+      // 1. Obtener micrófono
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
           echoCancellation: true,
-          noiseSuppression: true
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
 
@@ -92,31 +135,31 @@ class VoiceAgentWebClient {
       this.analyser.fftSize = 256;
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
-      // Conexión de audio
       this.audioInput.connect(this.analyser);
 
-      // Procesador de chunks de audio PCM
+      // 2. Procesador PCM de audio
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      this.processor.onaudioprocess = (e) => this.handleAudioProcess(e);
-      
+      this.processor.onaudioprocess = (e) => this.handleAudioInput(e);
+
       this.audioInput.connect(this.processor);
       this.processor.connect(this.audioContext.destination);
 
-      // Iniciar WebSocket
+      // 3. Conectar WebSocket
       this.connectWebSocket();
 
       // UI
       this.isConnected = true;
-      this.toggleBtn.className = "mic-button active";
+      this.toggleMicBtn.className = "cta-button active";
       this.btnText.textContent = "DETENER CONVERSACIÓN";
-      this.overlay.classList.add("hidden");
-      this.setStatus("connected", "Escuchando");
+      this.stageOverlay.classList.add("hidden");
+      this.setStatus("connected", "En Línea");
 
-      this.startWaveformAnimation();
+      this.startActiveWaveform();
     } catch (err) {
-      console.error("Error al iniciar sesión de audio:", err);
-      this.setStatus("disconnected", "Error de micrófono");
-      alert("No se pudo acceder al micrófono: " + err.message);
+      console.error("Error al acceder al micrófono:", err);
+      this.setStatus("disconnected", "Error Micrófono");
+      alert("Error al iniciar micrófono: " + err.message);
+      this.stopSession();
     }
   }
 
@@ -129,8 +172,8 @@ class VoiceAgentWebClient {
     this.socket.binaryType = "arraybuffer";
 
     this.socket.onopen = () => {
-      console.log("WebSocket conectado con Aura Voice AI");
-      this.setStatus("connected", "En Línea");
+      console.log("✅ WebSocket conectado a Aura Voice Agent.");
+      this.setStatus("connected", "Escuchando");
     };
 
     this.socket.onmessage = (event) => {
@@ -138,18 +181,20 @@ class VoiceAgentWebClient {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "caption") {
-            this.addCaption("bot", msg.text);
+            this.addCaption(msg.role || "bot", msg.text);
+          } else if (msg.type === "status") {
+            this.updateProviders(msg);
           }
         } catch (e) {
-          console.warn("Mensaje de texto no JSON:", event.data);
+          console.warn("Mensaje texto no JSON:", event.data);
         }
       } else if (event.data instanceof ArrayBuffer) {
         this.playAudioBuffer(event.data);
       }
     };
 
-    this.socket.onerror = (e) => {
-      console.warn("WebSocket error:", e);
+    this.socket.onerror = (err) => {
+      console.warn("WebSocket error:", err);
     };
 
     this.socket.onclose = () => {
@@ -160,11 +205,16 @@ class VoiceAgentWebClient {
     };
   }
 
-  handleAudioProcess(event) {
+  updateProviders(msg) {
+    if (msg.stt) document.getElementById("stt-val").textContent = msg.stt;
+    if (msg.llm) document.getElementById("llm-val").textContent = msg.llm;
+    if (msg.tts) document.getElementById("tts-val").textContent = msg.tts;
+  }
+
+  handleAudioInput(event) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
     const inputData = event.inputBuffer.getChannelData(0);
-    // Convertir Float32 a Int16 PCM binario
     const pcm16 = new Int16Array(inputData.length);
     for (let i = 0; i < inputData.length; i++) {
       let s = Math.max(-1, Math.min(1, inputData[i]));
@@ -176,12 +226,12 @@ class VoiceAgentWebClient {
   playAudioBuffer(arrayBuffer) {
     if (!this.audioContext) return;
     this.setStatus("speaking", "Hablando");
-    
-    // Interpretar PCM 16bit recibido y reproducir
+    this.isSpeaking = true;
+
     const pcm16 = new Int16Array(arrayBuffer);
     const audioBuffer = this.audioContext.createBuffer(1, pcm16.length, 16000);
     const channelData = audioBuffer.getChannelData(0);
-    
+
     for (let i = 0; i < pcm16.length; i++) {
       channelData[i] = pcm16[i] / 32768.0;
     }
@@ -190,15 +240,41 @@ class VoiceAgentWebClient {
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
     source.onended = () => {
+      this.isSpeaking = false;
       this.setStatus("connected", "Escuchando");
     };
     source.start();
   }
 
+  playAudioTest() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, ctx.currentTime); // Nota La 440Hz
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+
+      this.addCaption("bot", "🔊 Prueba de audio de altavoces ejecutada correctamente.");
+    } catch (e) {
+      alert("Error en prueba de audio: " + e.message);
+    }
+  }
+
   stopSession() {
     this.isConnected = false;
     if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream.getTracks().forEach(t => t.stop());
     }
     if (this.audioContext) {
       this.audioContext.close();
@@ -208,57 +284,103 @@ class VoiceAgentWebClient {
     }
     cancelAnimationFrame(this.animationId);
 
-    this.toggleBtn.className = "mic-button idle";
+    this.toggleMicBtn.className = "cta-button idle";
     this.btnText.textContent = "INICIAR CONVERSACIÓN";
-    this.overlay.classList.remove("hidden");
+    this.stageOverlay.classList.remove("hidden");
     this.setStatus("disconnected", "Desconectado");
-    this.drawIdleWaveform();
+    this.startIdleAnimation();
   }
 
-  startWaveformAnimation() {
-    const draw = () => {
-      this.animationId = requestAnimationFrame(draw);
-      this.analyser.getByteFrequencyData(this.dataArray);
+  /* ============================================================================
+     4. WAVEFORM VISUALIZER RENDERING (Canvas)
+     ============================================================================ */
+  startActiveWaveform() {
+    cancelAnimationFrame(this.animationId);
 
+    const render = () => {
+      this.animationId = requestAnimationFrame(render);
+      if (!this.analyser) return;
+
+      this.analyser.getByteFrequencyData(this.dataArray);
       const width = this.canvas.width;
       const height = this.canvas.height;
       this.canvasCtx.clearRect(0, 0, width, height);
 
-      // Gradiente Neon
+      // Calcular gradiente según tema
+      const style = getComputedStyle(document.documentElement);
+      const colorStart = style.getPropertyValue("--waveform-gradient-start").trim() || "#6366f1";
+      const colorMid = style.getPropertyValue("--waveform-gradient-mid").trim() || "#06b6d4";
+      const colorEnd = style.getPropertyValue("--waveform-gradient-end").trim() || "#10b981";
+
       const gradient = this.canvasCtx.createLinearGradient(0, 0, width, 0);
-      gradient.addColorStop(0, "#6366f1");
-      gradient.addColorStop(0.5, "#06b6d4");
-      gradient.addColorStop(1, "#10b981");
+      gradient.addColorStop(0, colorStart);
+      gradient.addColorStop(0.5, colorMid);
+      gradient.addColorStop(1, colorEnd);
 
-      const barWidth = (width / this.dataArray.length) * 2.2;
-      let x = 0;
+      // 1. Barras de Frecuencia
+      const barCount = 48;
+      const barWidth = (width / barCount) * 0.7;
+      const step = Math.floor(this.dataArray.length / barCount);
 
-      for (let i = 0; i < this.dataArray.length; i++) {
-        const barHeight = (this.dataArray[i] / 255) * (height * 0.75);
+      for (let i = 0; i < barCount; i++) {
+        const val = this.dataArray[i * step] || 0;
+        const barHeight = Math.max(4, (val / 255) * (height * 0.75));
+        const x = i * (width / barCount) + (width / barCount - barWidth) / 2;
+        const y = height / 2 - barHeight / 2;
+
         this.canvasCtx.fillStyle = gradient;
-        this.canvasCtx.shadowBlur = 12;
-        this.canvasCtx.shadowColor = "#06b6d4";
-        this.canvasCtx.fillRect(x, height / 2 - barHeight / 2, barWidth - 2, barHeight);
-        x += barWidth;
+        this.canvasCtx.shadowBlur = 10;
+        this.canvasCtx.shadowColor = colorMid;
+        this.canvasCtx.beginPath();
+        this.canvasCtx.roundRect(x, y, barWidth, barHeight, 4);
+        this.canvasCtx.fill();
       }
+
+      // 2. Onda Suave Continua (Sine Wave Overlay)
+      this.phase += 0.05;
+      this.canvasCtx.beginPath();
+      this.canvasCtx.strokeStyle = colorStart;
+      this.canvasCtx.lineWidth = 2;
+      this.canvasCtx.shadowBlur = 8;
+      this.canvasCtx.shadowColor = colorStart;
+
+      for (let x = 0; x < width; x += 10) {
+        const y = height / 2 + Math.sin(x * 0.02 + this.phase) * 12;
+        if (x === 0) this.canvasCtx.moveTo(x, y);
+        else this.canvasCtx.lineTo(x, y);
+      }
+      this.canvasCtx.stroke();
     };
-    draw();
+
+    render();
   }
 
-  drawIdleWaveform() {
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    this.canvasCtx.clearRect(0, 0, width, height);
-    
-    this.canvasCtx.beginPath();
-    this.canvasCtx.moveTo(0, height / 2);
-    this.canvasCtx.lineTo(width, height / 2);
-    this.canvasCtx.strokeStyle = "rgba(99, 102, 241, 0.25)";
-    this.canvasCtx.lineWidth = 2;
-    this.canvasCtx.stroke();
+  startIdleAnimation() {
+    cancelAnimationFrame(this.animationId);
+
+    const render = () => {
+      this.animationId = requestAnimationFrame(render);
+      const width = this.canvas.width;
+      const height = this.canvas.height;
+      this.canvasCtx.clearRect(0, 0, width, height);
+
+      this.phase += 0.02;
+      this.canvasCtx.beginPath();
+      this.canvasCtx.strokeStyle = "rgba(99, 102, 241, 0.25)";
+      this.canvasCtx.lineWidth = 2;
+
+      for (let x = 0; x < width; x += 10) {
+        const y = height / 2 + Math.sin(x * 0.015 + this.phase) * 6;
+        if (x === 0) this.canvasCtx.moveTo(x, y);
+        else this.canvasCtx.lineTo(x, y);
+      }
+      this.canvasCtx.stroke();
+    };
+
+    render();
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.voiceClient = new VoiceAgentWebClient();
+  window.auraApp = new VoiceAgentApp();
 });
