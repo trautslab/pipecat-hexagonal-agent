@@ -207,13 +207,13 @@ class AutonomousReasoningEngine:
         """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
         t = text.lower()
         
-        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:", "5:", "17:"]):
+        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:", "5:", "17:", "10"]):
             return None
 
-        has_time = bool(re.search(r'\b\d{1,2}:\d{2}\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "4:09", "4:15", "5:15", "17:15", "septiembre", "octubre", "noviembre"])
-        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu", "llámalo", "llamalo"])
+        has_time = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "mañana", "hoy", "pasado mañana", "septiembre", "octubre", "noviembre"])
+        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "agéndame", "agendame", "crea", "créame", "creame", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu", "llámalo", "llamalo", "reunión", "reunion", "cita"])
 
-        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google", "cine"])):
+        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google", "cine", "reunión", "reunion", "cita"])):
             return "google-calendar"
             
         if any(w in t for w in ["hello world", "sincronizar", "sincroniza", "sync-google-calendar"]):

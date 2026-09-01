@@ -6,23 +6,18 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `1.5.0`
+- **Versión:** `1.6.0`
 - **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
-- **Estado General:** `ESTABLE / EXTRACTOR NLP DE EVENTOS Y DESCRIPCIONES AMABLES COMPLETADO`
+- **Estado General:** `ESTABLE / RAZONAMIENTO NATIVO DEL LLM Y TOOL CALLING PROACTIVO COMPLETADOS`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
-1. **Extractor NLP de Eventos (`AutonomousReasoningEngine`):**
-   - Títulos nombrados con cláusulas (`llámalo preparación para ir al cine Planet de 2 de mayo`).
-   - Fechas explícitas completas (`1 de septiembre del 2026` -> `2026-09-01`).
-   - Horas con modificadores (`5:15 de la tarde` -> `17:15:00`).
-   - Detección de ubicaciones (`Cineplanet - 2 de Mayo`).
-   - Generación de descripciones enriquecidas amables con recordatorios.
+1. **Razonamiento Nativo del LLM (`llm_reason_and_extract_tool_call`):** El propio modelo `llama3.1:8b` razona la intención del usuario, extrae los parámetros (título, fecha, hora, ubicación) y aplica reglas de proactividad y mejores prácticas directamente en un payload JSON antes de invocar las herramientas.
 2. **Google Calendar API v3 Real & OAuth2:** Inserción física en la cuenta de Google con enlaces directos (`htmlLink`).
 3. **Layout Postman / Modern IDE Workbench:** 5 zonas de trabajo con visualizador de audio, visor de respuestas y consola ReAct en vivo.
-4. **Gobernanza AI-SDLC:** `UC-001` a `UC-016`, `TASK-001` a `TASK-018`, `SEQ-001` a `SEQ-014`, `ADR-0001` a `ADR-0015`.
-5. **Eval Harness & Invariantes:** 18/18 tareas y 5/5 unit tests verificados con `demo_live.sh`.
+4. **Gobernanza AI-SDLC:** `UC-001` a `UC-017`, `TASK-001` a `TASK-019`, `SEQ-001` a `SEQ-015`, `ADR-0001` a `ADR-0016`.
+5. **Eval Harness & Invariantes:** 19/19 tareas y 5/5 unit tests verificados con `demo_live.sh`.
 
 ---
 
