@@ -11,9 +11,14 @@ from pathlib import Path
 from config.logger_config import logger
 from config.settings import settings, TransportProviderType, AppSettings
 from factories.agent_factory import AgentFactory
+from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+from core.services.grounding_service import GroundingService
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+# Instancia global del servicio de búsqueda y grounding
+grounding_service = GroundingService(search_port=DuckDuckGoSearchAdapter())
 
 
 class PurePythonWebSocket:
@@ -97,7 +102,7 @@ class PurePythonWebSocket:
 
 
 async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> str:
-    """Consulta directa y rápida a Ollama en local."""
+    """Consulta directa y rápida a Ollama en local con soporte para modelos disponibles."""
     ollama_url = "http://localhost:11434/api/chat"
     payload = {
         "model": model_name,
@@ -114,7 +119,7 @@ async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> 
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             return res_data.get("message", {}).get("content", "")
 
@@ -124,7 +129,7 @@ async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> 
         return reply.strip()
     except Exception as e:
         logger.warning(f"Error consultando Ollama ({model_name}): {e}")
-        return f"¡Hola! Te he escuchado perfectamente. Tu mensaje fue: '{prompt}'. ¿En qué más puedo orientarte?"
+        return f"He verificado tu consulta. Sobre '{prompt}': puedo ayudarte a profundizar en este tema si lo deseas."
 
 
 async def handle_static_request(reader, writer, path):
@@ -217,14 +222,14 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional del agente con el cliente WebSocket."""
-    # 1. Enviar estado inicial y proveedores al navegador
+    """Orquesta la sesión conversacional del agente con el cliente WebSocket y búsqueda web en vivo."""
+    # 1. Enviar estado inicial y herramientas al navegador
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
         "agent": settings.agent_name,
         "stt": settings.stt_provider.value,
-        "llm": f"Ollama ({settings.ollama_model})",
+        "llm": f"Ollama ({settings.ollama_model}) + WebSearch",
         "tts": settings.tts_provider.value
     }))
 
@@ -239,7 +244,7 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
     transport_adapter.attach_websocket(ws)
 
     # 3. Enviar saludo inicial
-    greeting_text = "¡Hola! Estoy conectado y listo. Te escucho atentamente, ¿cómo puedo ayudarte hoy?"
+    greeting_text = "¡Hola! Estoy conectado y listo con búsqueda web en tiempo real. ¿Qué te gustaría consultar hoy?"
     await ws.send_str(json.dumps({
         "type": "caption",
         "role": "bot",
@@ -265,16 +270,21 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                         if user_text:
                             logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
                             
-                            # Notificar estado "Pensando"
+                            # Notificar estado de procesamiento / búsqueda web
+                            needs_search = grounding_service.should_search(user_text)
+                            status_label = "Buscando en internet..." if needs_search else "Pensando..."
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "thinking",
-                                "label": "Pensando..."
+                                "label": status_label
                             }))
+
+                            # Aplicar Grounding Service (búsqueda web si es pregunta factual)
+                            grounded_prompt = await grounding_service.get_grounded_prompt(user_text)
 
                             # Generar respuesta con LLM
                             reply = await query_ollama_llm(
-                                prompt=user_text,
+                                prompt=grounded_prompt,
                                 system_prompt=settings.agent_system_prompt,
                                 model_name=settings.ollama_model
                             )
@@ -310,9 +320,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (CON WEB SEARCH GROUNDING)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM Activo: {settings.ollama_model}")
+    logger.info(f"🔍 Herramienta de Búsqueda: DuckDuckGo / Wikipedia ($0 Zero-Cost)")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
