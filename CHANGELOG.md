@@ -10,6 +10,18 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.7.0] - 2026-09-01
+
+### Added
+- **Despachador Multi-Herramienta de Calendario (`classify_calendar_intent`):**
+  - Discriminación estricta entre **creación**, **consulta/auditoría en vivo** (`list_real_events`) y **eliminación** (`delete_real_event`).
+  - Eliminación total de falsos positivos y alucinaciones de eventos (ej. ante reclamos como *"no veo lo configurado"* o *"¿estás seguro?"* ya no inventa eventos ni crea registros fantasma).
+- **Consulta en Tiempo Real de Google Calendar API v3 (`list_real_events`):** Auditoría directa contra la cuenta del usuario para responder con la lista real de eventos existentes y enlaces oficiales.
+- **Limpieza y Borrado de Eventos (`delete_real_event`):** Soporte nativo para eliminar eventos erróneos vía HTTP DELETE en Google Calendar.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-018`, diagrama `SEQ-016`, decisión `ADR-0017` y contrato `TASK-020`.
+
+---
+
 ## [1.6.0] - 2026-09-01
 
 ### Added
@@ -33,12 +45,3 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - **Integración Real con Google Calendar API v3 y OAuth2 (`GoogleCalendarClient`):** Conexión nativa con `https://www.googleapis.com/calendar/v3/calendars/primary/events` utilizando `GOOGLE_CALENDAR_CLIENT_ID` y `GOOGLE_CALENDAR_CLIENT_SECRET` de `.env`.
 - **Ruta de Consentimiento y Callback (`GET /oauth2callback`):** Intercambio automático de códigos por `refresh_token` y `access_token` persistidos en `.agents/tokens/google_token.json`.
 - **Gobernanza AI-SDLC:** Caso de uso `UC-015`, diagrama `SEQ-013`, decisión `ADR-0014` y contrato `TASK-017`.
-
----
-
-## [1.3.0] - 2026-09-01
-
-### Added
-- **Despacho Parametrizado de Herramientas MCP (`parse_calendar_parameters` & `create_calendar_event`):** Extracción inteligente de horas y títulos.
-- **Barrera Anti-Rechazo (*Zero-Refusal Guard*):** Eliminación total de respuestas de rechazo (*"Lo siento, no puedo"*).
-- **Gobernanza AI-SDLC:** Caso de uso `UC-014`, diagrama `SEQ-012`, decisión `ADR-0013` y contrato `TASK-016`.

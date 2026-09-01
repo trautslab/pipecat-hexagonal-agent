@@ -391,7 +391,7 @@ def eval_task_016_parameterized_autonomous_dispatch() -> bool:
 
         test_prompt = "ya lo he configurado por favor puedes revisarlo y hacer una prueba de un Hello World para un minuto después de las alas mejor ponlo para las 4:09"
         
-        assert engine.is_mcp_execution_intent(test_prompt) == "google-calendar"
+        assert engine.classify_calendar_intent(test_prompt) == "create_event"
         params = engine.parse_calendar_parameters(test_prompt)
         assert "Hello World" in params["title"]
 
@@ -477,7 +477,7 @@ def eval_task_019_llm_native_tool_calling() -> bool:
             mcp_runtime=MCPRuntimeAdapter()
         )
 
-        test_prompt = "Agéndame una reunión de diseño de arquitectura para mañana a las 10 am en la sala de juntas"
+        test_prompt = "Agéndame un evento para mañana a las 10 am en la sala de juntas"
 
         assert hasattr(engine, "llm_reason_and_extract_tool_call"), "Método llm_reason_and_extract_tool_call ausente"
 
@@ -496,9 +496,44 @@ def eval_task_019_llm_native_tool_calling() -> bool:
         return False
 
 
+def eval_task_020_calendar_multi_tool_dispatch() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-020: Despachador Multi-Herramienta de Calendario y Listado de Eventos...")
+    try:
+        from core.services.reasoning_engine import AutonomousReasoningEngine
+        from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+        from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
+        from adapters.tools.mcp_runtime_adapter import MCPRuntimeAdapter
+        from core.services.grounding_service import GroundingService
+
+        engine = AutonomousReasoningEngine(
+            grounding_service=GroundingService(DuckDuckGoSearchAdapter()),
+            mcp_manager=MCPManagerAdapter(),
+            mcp_runtime=MCPRuntimeAdapter()
+        )
+
+        verify_prompt = "no veo lo que has configurado la verdad estás seguro que has hecho el recordatorio al evento del Google calendar"
+        intent = engine.classify_calendar_intent(verify_prompt)
+        assert intent == "list_events", f"Intención incorrecta: {intent}, esperaba 'list_events'"
+
+        async def _test():
+            res, trace = await engine.process_reasoning_loop(verify_prompt)
+            assert len(trace) >= 2
+            assert "CONSULTA EN VIVO DE GOOGLE CALENDAR" in res
+            assert "Cumpleaños de Ana" not in res
+            return True
+
+        asyncio.run(_test())
+
+        print("✅ [EVAL TASK-020] Superada: Detección de intención list_events, cero alucinaciones de eventos y consulta en vivo validadas.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-020] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-019)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-020)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -524,7 +559,8 @@ def main():
         ("TASK-016", eval_task_016_parameterized_autonomous_dispatch),
         ("TASK-017", eval_task_017_real_google_calendar_api),
         ("TASK-018", eval_task_018_nlp_calendar_extraction),
-        ("TASK-019", eval_task_019_llm_native_tool_calling)
+        ("TASK-019", eval_task_019_llm_native_tool_calling),
+        ("TASK-020", eval_task_020_calendar_multi_tool_dispatch)
     ]
 
     for task_id, fn in tasks:

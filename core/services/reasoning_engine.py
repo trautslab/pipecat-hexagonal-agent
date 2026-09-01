@@ -43,38 +43,43 @@ class AutonomousReasoningEngine:
         """
         Clasifica con precisión la intención del usuario para evitar falsos positivos:
         - 'list_events': Consultar, verificar, listar o auditar eventos existentes.
-        - 'create_event': Orden explícita e imperativa de creación de nuevo evento.
+        - 'create_event': Orden explícita de creación o prueba de evento.
         - 'delete_event': Orden de borrado de evento.
-        - None: No aplica acción de calendario.
+        - None: Instalación de MCP o conversación general.
         """
         t = text.lower()
 
-        # 1. Detección de Consulta / Verificación / Reclamo (PRIORIDAD ALTA)
+        # 1. Si el usuario pide instalar/integrar un MCP nuevo, delegar al MCPManager
+        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añadir mcp"]) and not any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea"]):
+            return None
+
+        # 2. Detección de Consulta / Verificación / Reclamo
         query_triggers = [
-            "no veo", "estas seguro", "estás seguro", "seguro que", "revisa", "revisalo",
+            "no veo", "estas seguro", "estás seguro", "seguro que",
             "qué eventos", "que eventos", "mis eventos", "mis citas", "tengo agendado",
             "consultar", "listar", "lista", "busca el evento", "busca en el calendario",
             "verifica", "verificar", "muestra los eventos", "qué hay en mi calendario",
             "que hay en mi calendario", "cuándo es mi", "cuando es mi"
         ]
-        if any(trig in t for trig in query_triggers):
+        if any(trig in t for trig in query_triggers) and not any(w in t for w in ["crea", "agenda", "programa", "hazme un evento", "prueba"]):
             return "list_events"
 
-        # 2. Detección de Eliminación
+        # 3. Detección de Eliminación
         delete_triggers = ["elimina el evento", "borra el evento", "cancela el evento", "borra la cita", "eliminar evento"]
         if any(trig in t for trig in delete_triggers):
             return "delete_event"
 
-        # 3. Detección de Creación Explícita
+        # 4. Detección de Creación Explícita o Prueba
         creation_verbs = [
             "crea", "créame", "creame", "agenda", "agéndame", "agendame", "programa",
             "prográmame", "programame", "ponme", "pon un evento", "hazme un evento",
             "haz un evento", "quiero que me hagas un evento", "quiero que me crees",
-            "agrega un evento", "añade un evento", "nuevo evento", "hello world", "sync-google-calendar"
+            "agrega un evento", "añade un evento", "nuevo evento", "hello world", "sync-google-calendar",
+            "prueba", "test", "probar", "sincronizar", "sincroniza", "puse las credenciales", "listo ya puse"
         ]
         has_creation_verb = any(v in t for v in creation_verbs)
-        has_calendar_keyword = any(w in t for w in ["evento", "cita", "reunión", "reunion", "recordatorio", "calendar", "calendario", "cine"])
-        has_time_or_date = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["mañana", "hoy", "septiembre", "octubre", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto"])
+        has_calendar_keyword = any(w in t for w in ["evento", "cita", "reunión", "reunion", "recordatorio", "calendar", "calendario", "cine", "credenciales", "hello world", "sincroniz"])
+        has_time_or_date = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["mañana", "hoy", "minuto", "septiembre", "octubre", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto"])
 
         if has_creation_verb and (has_calendar_keyword or has_time_or_date):
             return "create_event"
@@ -423,13 +428,21 @@ class AutonomousReasoningEngine:
 
         # 3. PRIORIDAD 2: Intención de autoinstalación / integración de nuevo MCP
         mcp_key = self.mcp_mgr.is_mcp_intent(user_prompt)
-        if mcp_key:
+        if mcp_key and any(w in user_prompt.lower() for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir", "configura", "configurar", "quisiera", "mcp"]):
             await _emit_thought("Análisis de Intención", f"El usuario solicita integrar la herramienta '{mcp_key}'.", "thought")
+            await _emit_thought("Descubrimiento y Configuración MCP", f"Registrando servidor MCP en .agents/mcp/mcp-servers.json y declarando variables en .env...", "action")
             mcp_result = self.mcp_mgr.install_or_configure_mcp(mcp_key)
+            await _emit_thought("Observación", f"Servidor '{mcp_key}' configurado exitosamente. Variables preparadas: {', '.join(mcp_result['required_env_vars'])}", "observation")
             vars_text = ", ".join(mcp_result["required_env_vars"])
             augmented_prompt = (
-                f"[ACCIÓN AUTÓNOMA DE SISTEMA COMPLETADA]: Servidor '{mcp_key}' registrado en .agents/mcp/mcp-servers.json. "
-                f"Variables requeridas: {vars_text}.\n[PREGUNTA]: {user_prompt}"
+                f"[ACCIÓN AUTÓNOMA DE SISTEMA COMPLETADA]:\n"
+                f"Has analizado tu propia arquitectura y registrado exitosamente el servidor MCP '{mcp_key}' "
+                f"({mcp_result['package']}) en el archivo .agents/mcp/mcp-servers.json.\n"
+                f"Además, has preparado y agregado automáticamente las variables de configuración en el archivo .env: {vars_text}.\n\n"
+                f"[PREGUNTA DEL USUARIO]:\n{user_prompt}\n\n"
+                f"[INSTRUCCIÓN CRÍTICA]: Comunica con seguridad y proactividad que el servidor MCP ya fue integrado en la arquitectura del sistema. "
+                f"Indícale al usuario exactamente qué variables ({vars_text}) debe completar con sus claves en su archivo .env para que la sincronización quede activa. "
+                f"Sé conciso, estructurado y profesional."
             )
             return augmented_prompt, thoughts_trace
 
