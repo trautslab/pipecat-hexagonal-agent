@@ -10,6 +10,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.9.0] - 2026-09-01
+
+### Added
+- **Ejecutor Activo de Herramientas MCP (`MCPExecutorPort` & `MCPExecutorAdapter`):** Permite al agente validar credenciales en `.env` e invocar de manera real las herramientas de los servidores MCP sin solicitar configuraciones manuales o alucinar comandos.
+- **Sonda Proactiva de Google Calendar (*Hello World*):** Al detectar credenciales configuradas, el agente agenda automáticamente un evento de prueba en Google Calendar programado para `now + 1 minuto`.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-010`, diagrama `SEQ-008`, decisión `ADR-0009` y contrato `TASK-012`.
+
+---
+
 ## [0.8.0] - 2026-09-01
 
 ### Added

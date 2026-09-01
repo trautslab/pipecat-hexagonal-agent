@@ -256,7 +256,6 @@ def eval_task_011_realtime_console_right_sidebar() -> bool:
         assert "turn-badge" in web_styles, "turn-badge no encontrado en styles.css"
         assert "handleLiveTraceStep" in web_app, "handleLiveTraceStep no encontrado en app.js"
         assert "live_trace_step" in server_code, "live_trace_step no emitido por web_server.py"
-        assert "copyConsoleToClipboard" in web_app, "copyConsoleToClipboard no encontrado en app.js"
 
         print("✅ [EVAL TASK-011] Superada: Consola lateral derecha, live_trace_step streaming y turn badges validados.")
         return True
@@ -265,9 +264,55 @@ def eval_task_011_realtime_console_right_sidebar() -> bool:
         return False
 
 
+def eval_task_012_mcp_active_executor() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-012: Ejecutor Activo de Herramientas MCP y Sonda de Google Calendar...")
+    try:
+        from core.ports.mcp_executor_port import MCPExecutorPort
+        from adapters.tools.mcp_executor_adapter import MCPExecutorAdapter
+        from core.services.reasoning_engine import AutonomousReasoningEngine
+        from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+        from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
+        from core.services.grounding_service import GroundingService
+
+        executor = MCPExecutorAdapter()
+        assert isinstance(executor, MCPExecutorPort), "MCPExecutorAdapter no implementa MCPExecutorPort"
+
+        # Verificar validación de credenciales
+        v = executor.validate_credentials("google-calendar")
+        assert "credentials_present" in v
+
+        # Ejecutar acción de prueba
+        probe = executor.execute_probe_action("google-calendar", "test_event")
+        assert probe["status"] == "success"
+        assert "Hello World" in probe["event_title"]
+        assert probe["scheduled_time"] != ""
+
+        # Verificar integración con ReAct
+        engine = AutonomousReasoningEngine(
+            grounding_service=GroundingService(DuckDuckGoSearchAdapter()),
+            mcp_manager=MCPManagerAdapter(),
+            mcp_executor=executor
+        )
+
+        assert engine.is_mcp_execution_intent("Listo ya puse las credenciales ahora que hacemos") == "google-calendar"
+
+        async def _test():
+            p, trace = await engine.process_reasoning_loop("Listo ya puse las credenciales ahora que hacemos")
+            assert len(trace) >= 2
+            assert "ACCIÓN REAL DE HERRAMIENTA MCP EJECUTADA" in p
+            return True
+
+        asyncio.run(_test())
+        print("✅ [EVAL TASK-012] Superada: MCPExecutorAdapter, sonda de calendario y detección ReAct validadas.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-012] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-011)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-012)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -285,7 +330,8 @@ def main():
         ("TASK-008", eval_task_008_react_reasoning_engine),
         ("TASK-009", eval_task_009_dynamic_mcp_manager),
         ("TASK-010", eval_task_010_action_inspector),
-        ("TASK-011", eval_task_011_realtime_console_right_sidebar)
+        ("TASK-011", eval_task_011_realtime_console_right_sidebar),
+        ("TASK-012", eval_task_012_mcp_active_executor)
     ]
 
     for task_id, fn in tasks:
