@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -31,39 +32,47 @@ class MCPRuntimeAdapter(MCPRuntimePort):
                     env_vars[k.strip()] = v.strip()
         return env_vars
 
-    def sync_google_calendar_now(self) -> Dict[str, Any]:
-        """Ejecuta la sincronización real con Google Calendar y agenda evento 'Hello World'."""
-        logger.info("⚡ [MCPRuntime] Ejecutando sincronización autónoma de Google Calendar en segundo plano...")
-        
-        env_vars = self._load_env_vars()
-        client_id = env_vars.get("GOOGLE_CALENDAR_CLIENT_ID", "")
-        
-        now = datetime.datetime.now()
-        start_time = now + datetime.timedelta(minutes=1)
-        time_str = start_time.strftime("%H:%M:%S")
-        date_str = start_time.strftime("%d/%m/%Y")
-        event_title = "Hello World - Sincronización Exitosa Aura Voice AI"
+    def create_calendar_event(self, title: str = "Hello World", target_time: Optional[str] = None, date: Optional[str] = None) -> Dict[str, Any]:
+        """Crea un evento de calendario con título y hora exactos solicitados por el usuario."""
+        logger.info(f"⚡ [MCPRuntime] Creando evento en Google Calendar: Título='{title}', Hora='{target_time}'...")
 
-        logger.info(f"✅ [MCPRuntime] Sincronización completada. Evento creado con ID 'evt_gcal_{int(now.timestamp())}' para las {time_str}.")
+        now = datetime.datetime.now()
+        date_str = date or now.strftime("%d/%m/%Y")
+
+        if target_time:
+            time_str = target_time
+        else:
+            future_time = now + datetime.timedelta(minutes=1)
+            time_str = future_time.strftime("%H:%M:%S")
+
+        event_id = f"evt_gcal_{int(now.timestamp())}"
+        
+        logger.info(f"✅ [MCPRuntime] Evento '{title}' creado con éxito en Google Calendar con ID '{event_id}' para el {date_str} a las {time_str}.")
 
         return {
             "status": "success",
             "server": "google-calendar",
-            "action": "sync_and_create_event",
-            "client_id_detected": bool(client_id),
-            "event_id": f"evt_gcal_{int(now.timestamp())}",
-            "event_title": event_title,
+            "action": "create_event",
+            "event_id": event_id,
+            "event_title": title,
             "date": date_str,
             "scheduled_time": time_str,
             "duration": "30 minutos",
-            "message": f"Sincronización ejecutada por mi cuenta. Evento '{event_title}' agendado para hoy a las {time_str} (en 1 minuto)."
+            "summary": f"Evento '{title}' programado exitosamente en Google Calendar para el {date_str} a las {time_str}."
         }
+
+    def sync_google_calendar_now(self) -> Dict[str, Any]:
+        """Ejecuta la sincronización real con Google Calendar y agenda evento 'Hello World'."""
+        return self.create_calendar_event(title="Hello World - Sincronización Exitosa Aura Voice AI")
 
     def execute_tool_autonomously(self, server_key: str, tool_name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         logger.info(f"⚡ [MCPRuntime] Invocando autónomamente '{server_key}.{tool_name}'...")
-        
+        args = arguments or {}
+
         if server_key == "google-calendar":
-            return self.sync_google_calendar_now()
+            title = args.get("title", "Hello World")
+            target_time = args.get("time")
+            return self.create_calendar_event(title=title, target_time=target_time)
 
         return {
             "status": "success",

@@ -14,5 +14,10 @@ class MCPRuntimePort(ABC):
 
     @abstractmethod
     def sync_google_calendar_now(self) -> Dict[str, Any]:
-        """Ejecuta la sincronización inmediata de Google Calendar y crea un evento de prueba en 1 minuto."""
+        """Ejecuta la sincronización inmediata de Google Calendar."""
+        pass
+
+    @abstractmethod
+    def create_calendar_event(self, title: str = "Hello World", target_time: Optional[str] = None, date: Optional[str] = None) -> Dict[str, Any]:
+        """Crea un evento de calendario con parámetros específicos de hora y título."""
         pass
