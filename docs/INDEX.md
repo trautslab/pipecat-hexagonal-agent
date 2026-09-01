@@ -11,6 +11,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0001`: Adopción de Arquitectura Hexagonal sobre Pipecat](adr/ADR-0001-hexagonal-architecture-pipecat.md)
   - [`ADR-0002`: Selección de Pila Local Gratuita (Whisper + Ollama + Piper)](adr/ADR-0002-zero-cost-local-stack.md)
   - [`ADR-0003`: Arquitectura de Transporte WebSocket para Cliente Web](adr/ADR-0003-websocket-web-client-architecture.md)
+  - [`ADR-0004`: Integración de SearchPort y Grounding en Tiempo Real](adr/ADR-0004-web-search-grounding.md)
 
 ---
 
@@ -22,6 +23,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-002`](use-cases/UC-002-zero-cost-local-execution.md) | Ejecución Local Offline Gratuita | Local AI | [`SEQ-001`](diagrams/sequences/SEQ-001-voice-streaming-pipeline.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-002`](../.agents/tasks/TASK-002-zero-cost-local-adapters.md) | `APPROVED` |
 | [`UC-003`](use-cases/UC-003-cloud-hybrid-switch.md) | Conmutación Cloud e Híbrida | Cloud AI | [`SEQ-001`](diagrams/sequences/SEQ-001-voice-streaming-pipeline.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-003`](../.agents/tasks/TASK-003-cloud-hybrid-adapters.md) | `APPROVED` |
 | [`UC-004`](use-cases/UC-004-web-browser-voice-interaction.md) | Interacción de Voz en Navegador Web | Web/WS | [`SEQ-002`](diagrams/sequences/SEQ-002-websocket-client-streaming.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-004`](../.agents/tasks/TASK-004-web-interface-websocket.md) | `APPROVED` |
+| [`UC-005`](use-cases/UC-005-web-search-grounded-qa.md) | Grounding Factual con Búsqueda Web | Tools/Grounding | [`SEQ-003`](diagrams/sequences/SEQ-003-tool-calling-search.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-005`](../.agents/tasks/TASK-005-web-search-tool.md) | `APPROVED` |
 
 ---
 
@@ -30,6 +32,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 ### Diagramas de Secuencia (`docs/diagrams/sequences/`)
 - [`SEQ-001`](diagrams/sequences/SEQ-001-voice-streaming-pipeline.md) — Flujo streaming de tramas de audio entre transporte, STT, LLM, TTS y altavoces.
 - [`SEQ-002`](diagrams/sequences/SEQ-002-websocket-client-streaming.md) — Streaming de audio y subtítulos bidireccional por WebSocket con cliente web.
+- [`SEQ-003`](diagrams/sequences/SEQ-003-tool-calling-search.md) — Flujo de invocación de búsqueda web e inyección de evidencias en el LLM.
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
