@@ -241,7 +241,7 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional con telemetría detallada y exportación."""
+    """Orquesta la sesión conversacional con streaming en tiempo real a la consola derecha."""
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
@@ -275,31 +275,45 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                         user_text = msg.get("text", "").strip()
                         history = msg.get("history", [])
                         session_id = msg.get("sessionId", "default")
+                        turn_index = msg.get("turnIndex", 1)
                         start_time = time.time()
 
                         if user_text:
-                            logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
+                            logger.info(f"🗣️ [Turno #{turn_index} - Usuario habló]: '{user_text}'")
                             
+                            # 1. Notificar inicio de turno en consola
+                            await ws.send_str(json.dumps({
+                                "type": "turn_start",
+                                "turnIndex": turn_index,
+                                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                "userPrompt": user_text
+                            }))
+
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "thinking",
-                                "label": "Razonando..."
+                                "label": f"Razonando Turno #{turn_index}..."
                             }))
 
-                            async def _send_thought(thought_item):
+                            # 2. Callback de streaming en tiempo real hacia la consola derecha
+                            async def _send_live_trace(thought_item):
+                                elapsed = int((time.time() - start_time) * 1000)
                                 await ws.send_str(json.dumps({
-                                    "type": "thought",
+                                    "type": "live_trace_step",
+                                    "turnIndex": turn_index,
+                                    "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                    "elapsed_ms": elapsed,
                                     "step": thought_item
                                 }))
 
-                            # 1. Procesar ciclo ReAct
+                            # 3. Procesar ciclo ReAct con emisión inmediata paso a paso
                             processed_prompt, raw_steps = await reasoning_engine.process_reasoning_loop(
                                 user_prompt=user_text,
                                 history=history,
-                                on_thought_callback=_send_thought
+                                on_thought_callback=_send_live_trace
                             )
 
-                            # 2. Consulta al LLM
+                            # 4. Consulta al LLM
                             reply = await query_ollama_llm(
                                 prompt=processed_prompt,
                                 system_prompt=settings.agent_system_prompt,
@@ -308,10 +322,11 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                             )
                             
                             duration_ms = int((time.time() - start_time) * 1000)
-                            logger.info(f"🤖 [Aura respondió en {duration_ms}ms]: '{reply[:120]}...'")
+                            logger.info(f"🤖 [Aura respondió Turno #{turn_index} en {duration_ms}ms]: '{reply[:120]}...'")
 
-                            # 3. Construir paquete completo de telemetría e inspección
+                            # 5. Construir paquete de telemetría final de este turno
                             telemetry_trace = {
+                                "turnIndex": turn_index,
                                 "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
                                 "iso_timestamp": datetime.datetime.now().isoformat(),
                                 "duration_ms": duration_ms,
@@ -321,9 +336,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                                 "files_affected": [".agents/mcp/mcp-servers.json", ".env"] if mcp_adapter.is_mcp_intent(user_text) else []
                             }
 
-                            # 4. Enviar respuesta final con telemetría completa
+                            # 6. Enviar respuesta final y cierre del turno en la consola
                             await ws.send_str(json.dumps({
                                 "type": "caption",
+                                "turnIndex": turn_index,
                                 "role": "bot",
                                 "text": reply,
                                 "speak": True,
@@ -350,10 +366,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (OPENCLAW ACTION INSPECTOR)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (REAL-TIME CONSOLE STREAMING)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM: {settings.ollama_model}")
-    logger.info(f"🔍 Observabilidad: Telemetría e Inspección de Acciones en Tiempo Real")
+    logger.info(f"⚡ Streaming: Pasos ReAct transmitidos en tiempo real por WebSocket")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
