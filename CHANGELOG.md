@@ -10,14 +10,22 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.0] - 2026-09-01
+
+### Added
+- **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia en `localStorage` e iconografía fluida (☀️ / 🌙).
+- **Servidor WebSocket RFC 6455 Nativo:** Implementación en `web_server.py` de handshake y framing de WebSocket binario/texto para conexión bidireccional inmediata con el navegador.
+- **Visualizador de Ondas Mejorado:** Renderizado reactivo en `<canvas>` con gradientes dinámicos adaptados al tema activo, animación de ondas seno y barras de frecuencia.
+- **Botón de Prueba de Audio:** Control interactivo para validar la salida de audio de los altavoces antes de iniciar la conversación.
+
+---
+
 ## [0.2.0] - 2026-09-01
 
 ### Added
-- **Interfaz Web Interactiva (`web/`):** Cliente web en HTML/CSS/JS con diseño Glassmorphism, Dark Mode, visualizador de ondas de audio en `<canvas>` en tiempo real y subtítulos en streaming.
-- **Adaptador de Transporte WebSocket (`WebSocketTransportAdapter`):** Permite la transmisión bidireccional de tramas de audio PCM de baja latencia con el navegador.
-- **Servidor Web Asíncrono (`web_server.py`):** Servidor HTTP y WebSocket ligero para servir el frontend y gestionar las conexiones de voz.
-- **Gobernanza AI-SDLC para Web:** Caso de uso `UC-004`, diagrama de secuencia `SEQ-002`, decisión arquitectónica `ADR-0003` y contrato de tarea `TASK-004`.
-- **Harness de Evaluación:** Inclusión del benchmark para `TASK-004` en `evals/harness.py`.
+- **Interfaz Web Interactiva (`web/`):** Cliente web en HTML/CSS/JS con diseño Glassmorphism, visualizador de ondas y subtítulos en streaming.
+- **Adaptador de Transporte WebSocket (`WebSocketTransportAdapter`):** Permite la transmisión de tramas de audio PCM de baja latencia con el navegador.
+- **Gobernanza AI-SDLC para Web:** Caso de uso `UC-004`, diagrama de secuencia `SEQ-002`, decisión `ADR-0003` y contrato `TASK-004`.
 
 ---
 
@@ -27,10 +35,5 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Arquitectura Hexagonal con puertos `STTPort`, `LLMPort`, `TTSPort` y `TransportPort`.
 - Core orquestador `VoiceAgentPipelineBuilder` con soporte para interrupciones (*barge-in*).
 - Adaptadores locales 100% gratuitos para Faster-Whisper, Ollama, Piper/Kokoro TTS y Audio local.
-- Adaptadores cloud listos para producción con Deepgram, OpenAI, Cartesia y Daily WebRTC.
-- `AgentFactory` para inyección de dependencias declarativa vía `.env`.
-- Entidad de dominio `AgentSession` para trazabilidad de contexto conversacional.
-- Gobernanza AI-SDLC: `AGENTS.md`, `HANDOFF.md`, `CLAUDE.md`, diagramas C4, ADRs y Casos de Uso.
-- Script de validación de invariantes arquitectónicos `scripts/validate_architecture.py`.
-- Harness de evaluación automatizada `evals/harness.py`.
-- Telemetría agéntica estructurada en `.agents/telemetry/events.jsonl`.
+- Adaptadores cloud con Deepgram, OpenAI, Cartesia y Daily WebRTC.
+- Gobernanza AI-SDLC completa (`AGENTS.md`, `HANDOFF.md`, `CLAUDE.md`, diagramas C4, ADRs y Eval Harness).
