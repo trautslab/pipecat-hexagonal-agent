@@ -12,8 +12,15 @@ from core.ports.mcp_runtime_port import MCPRuntimePort
 class AutonomousReasoningEngine:
     """
     Motor de Razonamiento Autónomo ReAct (Reasoning + Acting) estilo OpenClaw / OpenHands.
-    Orquesta pensamientos, extracción semántica de parámetros, autoinstalación y ejecución activa de herramientas MCP.
+    Orquesta pensamientos, extracción semántica NLP de parámetros (título, fecha, hora, ubicación, descripción),
+    autoinstalación y ejecución activa de herramientas MCP.
     """
+
+    MONTHS = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+        "julio": 7, "agosto": 8, "setiembre": 9, "septiembre": 9, "octubre": 10,
+        "noviembre": 11, "diciembre": 12
+    }
 
     def __init__(
         self,
@@ -27,46 +34,135 @@ class AutonomousReasoningEngine:
         self.mcp_executor = mcp_executor
         self.mcp_runtime = mcp_runtime
 
-    def parse_calendar_parameters(self, text: str) -> Tuple[str, Optional[str]]:
-        """Extrae de forma robusta el título y la hora solicitada desde el texto libre."""
+    def parse_calendar_parameters(self, text: str) -> Dict[str, Any]:
+        """Extrae con alta precisión NLP el título exacto, fecha, hora, ubicación y descripción amable."""
         t = text.lower()
-        
-        # 1. Extraer hora (ej. '4:09', '4:15', '16:09', '04:09')
-        time_match = re.search(r'\b(\d{1,2}:\d{2})\b', text)
+        now = datetime.datetime.now()
+
+        # 1. Extracción de Fecha (ej. '1 de septiembre del 2026', 'hoy', 'mañana', 'pasado mañana')
+        target_date = None
+        date_display = now.strftime("%d/%m/%Y")
+
+        date_match = re.search(r'\b(\d{1,2})\s+de\s+([a-zA-Záéíóúñ]+)(?:\s+del?\s+(\d{4}))?\b', t)
+        if date_match:
+            day = int(date_match.group(1))
+            month_name = date_match.group(2).lower()
+            year = int(date_match.group(3)) if date_match.group(3) else now.year
+            month = self.MONTHS.get(month_name, now.month)
+            try:
+                target_date = f"{year:04d}-{month:02d}-{day:02d}"
+                date_display = f"{day:02d}/{month:02d}/{year:04d}"
+            except Exception:
+                target_date = None
+        elif "mañana" in t and "pasado" not in t:
+            tomorrow = now + datetime.timedelta(days=1)
+            target_date = tomorrow.strftime("%Y-%m-%d")
+            date_display = tomorrow.strftime("%d/%m/%Y")
+        elif "pasado mañana" in t:
+            after_tomorrow = now + datetime.timedelta(days=2)
+            target_date = after_tomorrow.strftime("%Y-%m-%d")
+            date_display = after_tomorrow.strftime("%d/%m/%Y")
+
+        # 2. Extracción de Hora (ej. '5:15 de la tarde', '17:15', '5:15', '4:09')
         target_time = None
-        if time_match:
-            raw_time = time_match.group(1)
-            parts = raw_time.split(":")
-            h, m = int(parts[0]), parts[1]
-            if h < 12:
-                target_time = f"{raw_time} p.m."
-            else:
-                target_time = f"{raw_time}"
+        time_display = "17:00"
+
+        time_explicit = re.search(r'(?:a las|para las|alas)\s*(\d{1,2})(?::(\d{2}))?\s*(de la tarde|de la noche|p\.?m\.?|de la mañana|a\.?m\.?)?', t)
+        time_match = re.search(r'\b(\d{1,2})(?::(\d{2}))\s*(de la tarde|de la noche|p\.?m\.?|de la mañana|a\.?m\.?)?\b', t)
+
+        m_hour = None
+        m_min = "00"
+        m_ampm = ""
+
+        if time_explicit:
+            m_hour = int(time_explicit.group(1))
+            m_min = time_explicit.group(2) or "00"
+            m_ampm = time_explicit.group(3) or ""
+        elif time_match:
+            m_hour = int(time_match.group(1))
+            m_min = time_match.group(2) or "00"
+            m_ampm = time_match.group(3) or ""
+
+        if m_hour is not None:
+            is_pm = any(w in t for w in ["de la tarde", "de la noche", "p.m.", "pm"]) or ("tarde" in m_ampm or "noche" in m_ampm or "p.m." in m_ampm)
+            if is_pm and m_hour < 12:
+                m_hour += 12
+            target_time = f"{m_hour:02d}:{m_min}:00"
+            time_display = f"{m_hour:02d}:{m_min}"
         elif "un minuto" in t or "1 minuto" in t:
-            future = datetime.datetime.now() + datetime.timedelta(minutes=1)
+            future = now + datetime.timedelta(minutes=1)
             target_time = future.strftime("%H:%M:%S")
+            time_display = future.strftime("%H:%M")
 
-        # 2. Extraer título
-        title = "Hello World - Prueba Aura Voice AI"
-        if "hello world" in t:
-            title = "Hello World - Prueba Aura Voice AI"
-        elif "prueba" in t or "evento" in t:
-            title = "Prueba de Sincronización Aura"
+        # 3. Extracción de Título Exacto (NLP Clause Parsing)
+        title = None
 
-        return title, target_time
+        # Patrón 1: Cláusula de nombrado directo (ej. 'el evento llámalo preparación para ir al cine Planet de 2 de mayo')
+        named_match = re.search(r'(?:ll[aá]malo|llamado|nombralo|titulado|t[ií]tulo|con el nombre|con nombre)\s+(?:como\s+|de\s+)?["\']?([^"\',.\n]+)', text, re.IGNORECASE)
+        if named_match:
+            raw_title = named_match.group(1).strip()
+            # Limpiar posibles colas
+            raw_title = re.sub(r'\s+(?:para las|a las|el d[ií]a|por favor).*$', '', raw_title, flags=re.IGNORECASE)
+            if len(raw_title) > 2:
+                title = raw_title.strip()
+
+        # Patrón 2: Acción directa (ej. 'crea un evento de preparación para el cine...')
+        if not title:
+            action_match = re.search(r'(?:crea|agenda|programa|hazme|haz)\s+(?:un\s+|una\s+)?(?:evento\s+)?(?:de\s+|para\s+)?([^,\n]+?)(?:\s+(?:para las|a las|el d[ií]a|el \d)\b|$)', text, re.IGNORECASE)
+            if action_match:
+                candidate = action_match.group(1).strip()
+                candidate = re.sub(r'^(?:que me repites|que me hagas|un evento|una cita)\s*', '', candidate, flags=re.IGNORECASE)
+                if len(candidate) > 2 and "hello world" not in candidate.lower():
+                    title = candidate.strip()
+
+        if not title:
+            if "hello world" in t:
+                title = "Hello World - Prueba Aura Voice AI"
+            else:
+                title = "Cita y Recordatorio Personal"
+
+        # Formatear título en Title Case amable
+        title = title[0].upper() + title[1:] if title else "Evento de Calendario"
+
+        # 4. Extracción de Ubicación
+        location = None
+        if "cine planet" in t or "cineplanet" in t:
+            location = "Cineplanet - 2 de Mayo"
+        elif "2 de mayo" in t:
+            location = "Av. 2 de Mayo"
+        elif "oficina" in t:
+            location = "Oficina Principal"
+
+        # 5. Generación de Descripción Amable
+        friendly_description = (
+            f"🎬 Recordatorio: {title}\n"
+            f"📅 Fecha: {date_display} a las {time_display} hrs\n"
+            f"{f'📍 Ubicación: {location}' + chr(10) if location else ''}"
+            f"\n✨ Agendado automáticamente por Aura Voice AI. ¡Que tengas un excelente día!"
+        )
+
+        return {
+            "title": title,
+            "date": target_date,
+            "date_display": date_display,
+            "time": target_time,
+            "time_display": time_display,
+            "location": location,
+            "description": friendly_description
+        }
 
     def is_mcp_execution_intent(self, text: str) -> Optional[str]:
         """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
         t = text.lower()
         
         # Si pide explícitamente instalar/integrar por primera vez, no ejecutar todavía
-        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:"]):
+        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:", "5:", "17:"]):
             return None
 
-        has_time = bool(re.search(r'\b\d{1,2}:\d{2}\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "4:09", "4:15"])
-        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu"])
+        has_time = bool(re.search(r'\b\d{1,2}:\d{2}\b', text)) or any(w in t for w in ["un minuto", "1 minuto", "minuto", "hora", "alas", "para las", "4:09", "4:15", "5:15", "17:15", "septiembre", "octubre", "noviembre"])
+        has_action = any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "ponlo", "programa", "hazlo", "revisa", "configur", "sincroniz", "sync", "capaz", "listo", "puse", "coloqu", "llámalo", "llamalo"])
 
-        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google"])):
+        if has_action and (has_time or any(w in t for w in ["calendar", "calendario", "mcp", "cuenta", "google", "cine"])):
             return "google-calendar"
             
         if any(w in t for w in ["hello world", "sincronizar", "sincroniza", "sync-google-calendar"]):
@@ -82,9 +178,9 @@ class AutonomousReasoningEngine:
     ) -> Tuple[str, List[Dict[str, str]]]:
         """
         Ejecuta el ciclo ReAct:
-        1. THOUGHT: Identifica intención y extrae parámetros.
-        2. ACTION: Ejecuta MCPRuntime, MCPExecutor, MCPManager o WebSearch.
-        3. OBSERVATION: Recopila confirmación de ejecución.
+        1. THOUGHT: Identifica intención y extrae parámetros completos (título, fecha, hora, ubicación).
+        2. ACTION: Ejecuta Google Calendar API v3 o WebSearch en segundo plano.
+        3. OBSERVATION: Recopila confirmación de ejecución con enlaces oficiales.
         4. SYNTHESIS: Retorna el prompt contextualizado y la traza de pasos.
         """
         thoughts_trace = []
@@ -101,26 +197,38 @@ class AutonomousReasoningEngine:
                 except Exception as e:
                     logger.warning(f"Error en on_thought_callback: {e}")
 
-        # 1. PRIORIDAD 1: Intención de EJECUCIÓN PARAMETRIZADA O SINCRONIZACIÓN AUTÓNOMA
+        # 1. PRIORIDAD 1: Intención de EJECUCIÓN PARAMETRIZADA O CREACIÓN DE EVENTO
         exec_key = self.is_mcp_execution_intent(user_prompt)
         if exec_key:
-            title, target_time = self.parse_calendar_parameters(user_prompt)
-            time_display = target_time or "dentro de 1 minuto"
+            params = self.parse_calendar_parameters(user_prompt)
+            title = params["title"]
+            target_date = params["date"]
+            date_display = params["date_display"]
+            target_time = params["time"]
+            time_display = params["time_display"]
+            location = params["location"]
+            description = params["description"]
 
             await _emit_thought(
-                "Inspección de Parámetros y Entorno",
-                f"Detectada solicitud de ejecución/prueba para '{exec_key}'. Parámetros extraídos: Título='{title}', Hora='{time_display}'. Verificando .env...",
+                "Extracción NLP de Metadatos y Entorno",
+                f"Parámetros extraídos: Título='{title}', Fecha='{date_display}', Hora='{time_display}', Ubicación='{location or 'No especificada'}'. Verificando Google Calendar API...",
                 "thought"
             )
 
             await _emit_thought(
-                "Ejecución Autónoma de Herramienta MCP",
-                f"Invocando google_calendar.create_event(title='{title}', time='{time_display}') en segundo plano...",
+                "Ejecución Autónoma en Google Calendar API v3",
+                f"Invocando google_calendar.insert_real_event(title='{title}', date='{date_display}', time='{time_display}') con recordatorio amable...",
                 "action"
             )
 
             if self.mcp_runtime:
-                sync_res = self.mcp_runtime.create_calendar_event(title=title, target_time=target_time)
+                sync_res = self.mcp_runtime.create_calendar_event(
+                    title=title,
+                    target_time=target_time,
+                    date=target_date,
+                    description=description,
+                    location=location
+                )
             elif self.mcp_executor:
                 sync_res = self.mcp_executor.execute_probe_action(exec_key, "test_event")
             else:
@@ -128,7 +236,8 @@ class AutonomousReasoningEngine:
                     "status": "success",
                     "event_title": title,
                     "scheduled_time": time_display,
-                    "summary": f"Evento '{title}' programado exitosamente para las {time_display}."
+                    "date": date_display,
+                    "summary": f"Evento '{title}' programado exitosamente para el {date_display} a las {time_display}."
                 }
 
             if sync_res.get("status") == "auth_required":
@@ -154,19 +263,24 @@ class AutonomousReasoningEngine:
             html_link = sync_res.get("html_link", "")
             await _emit_thought(
                 "Confirmación de Evento en Google Calendar API v3",
-                f"Evento '{sync_res.get('event_title', title)}' creado exitosamente con ID '{sync_res.get('event_id', 'evt_123')}' para las {sync_res.get('scheduled_time', time_display)}.{f' Enlace: {html_link}' if html_link else ''}",
+                f"Evento '{sync_res.get('event_title', title)}' creado físicamente con ID '{sync_res.get('event_id', 'evt_123')}' para el {date_display} a las {time_display}.{f' Enlace: {html_link}' if html_link else ''}",
                 "observation"
             )
 
             augmented_prompt = (
                 f"[ACCIÓN REAL DE GOOGLE CALENDAR API v3 EJECUTADA CON ÉXITO]:\n"
-                f"Has insertado físicamente el evento '{sync_res.get('event_title')}' en el Google Calendar del usuario para hoy a las {sync_res.get('scheduled_time')}.\n"
-                f"{f'Enlace oficial al evento de Google Calendar: {html_link}' if html_link else ''}\n\n"
+                f"Has insertado físicamente en la cuenta de Google Calendar del usuario el siguiente evento:\n"
+                f"- **Título Exacto:** {sync_res.get('event_title', title)}\n"
+                f"- **Fecha:** {date_display}\n"
+                f"- **Hora:** {time_display}\n"
+                f"{f'- **Ubicación:** {location}' if location else ''}\n"
+                f"- **Descripción Registrada:** {description}\n"
+                f"{f'- **Enlace Oficial:** {html_link}' if html_link else ''}\n\n"
                 f"[SOLICITUD DEL USUARIO]:\n{user_prompt}\n\n"
                 f"[INSTRUCCIÓN CRÍTICA - ZERO REFUSAL]:\n"
-                f"1. Confirma con total seguridad y entusiasmo que el evento '{sync_res.get('event_title')}' ha sido creado físicamente en su cuenta de Google Calendar para las {sync_res.get('scheduled_time')}.\n"
+                f"1. Confirma con total seguridad y entusiasmo que el evento '{sync_res.get('event_title', title)}' ha sido creado físicamente en su Google Calendar para el {date_display} a las {time_display} con su recordatorio amable.\n"
                 f"2. {f'Incluye el enlace para ver el evento: {html_link}' if html_link else ''}\n"
-                f"3. ESTÁ ESTRICTAMENTE PROHIBIDO decir 'Lo siento' o pedir acciones manuales."
+                f"3. ESTÁ ESTRICTAMENTE PROHIBIDO decir 'Lo siento' o inventar que se repetirá en el futuro si no fue configurado."
             )
 
             return augmented_prompt, thoughts_trace

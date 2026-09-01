@@ -34,12 +34,24 @@ class MCPRuntimeAdapter(MCPRuntimePort):
                     env_vars[k.strip()] = v.strip()
         return env_vars
 
-    def create_calendar_event(self, title: str = "Hello World", target_time: Optional[str] = None, date: Optional[str] = None) -> Dict[str, Any]:
-        """Invoca la API oficial v3 de Google Calendar para insertar el evento en la cuenta del usuario."""
-        logger.info(f"⚡ [MCPRuntime] Procesando creación de evento en Google Calendar API v3: '{title}' ({target_time})...")
+    def create_calendar_event(
+        self,
+        title: str = "Hello World",
+        target_time: Optional[str] = None,
+        date: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Invoca la API oficial v3 de Google Calendar para insertar el evento con metadatos completos."""
+        logger.info(f"⚡ [MCPRuntime] Creando evento en Google Calendar API v3: Título='{title}', Fecha='{date}', Hora='{target_time}'...")
 
-        # Inserción real en Google Calendar API v3
-        result = self.gcal_client.insert_real_event(title=title, target_time=target_time, date=date)
+        result = self.gcal_client.insert_real_event(
+            title=title,
+            target_time=target_time,
+            date=date,
+            description=description,
+            location=location
+        )
         return result
 
     def sync_google_calendar_now(self) -> Dict[str, Any]:
@@ -53,7 +65,10 @@ class MCPRuntimeAdapter(MCPRuntimePort):
         if server_key == "google-calendar":
             title = args.get("title", "Hello World")
             target_time = args.get("time")
-            return self.create_calendar_event(title=title, target_time=target_time)
+            date = args.get("date")
+            description = args.get("description")
+            location = args.get("location")
+            return self.create_calendar_event(title=title, target_time=target_time, date=date, description=description, location=location)
 
         return {
             "status": "success",

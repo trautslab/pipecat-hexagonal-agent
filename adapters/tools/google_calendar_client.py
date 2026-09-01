@@ -151,9 +151,11 @@ class GoogleCalendarClient:
         title: str,
         target_time: Optional[str] = None,
         date: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
         duration_minutes: int = 30
     ) -> Dict[str, Any]:
-        """Inserta un evento real en Google Calendar API v3."""
+        """Inserta un evento real en Google Calendar API v3 con metadatos completos."""
         token = self.get_valid_access_token()
         
         if not token:
@@ -167,28 +169,52 @@ class GoogleCalendarClient:
 
         now = datetime.datetime.now()
 
-        # Parsear hora de inicio
+        # 1. Parsear Fecha
+        year, month, day = now.year, now.month, now.day
+        if date:
+            try:
+                if "-" in date:
+                    dp = date.split("-")
+                    year, month, day = int(dp[0]), int(dp[1]), int(dp[2])
+                elif "/" in date:
+                    dp = date.split("/")
+                    day, month, year = int(dp[0]), int(dp[1]), int(dp[2])
+            except Exception as e:
+                logger.warning(f"Error parseando fecha '{date}': {e}")
+
+        # 2. Parsear Hora de Inicio
+        h, m = now.hour, now.minute
         if target_time:
-            clean_time = target_time.replace("p.m.", "").replace("a.m.", "").strip()
-            parts = clean_time.split(":")
-            h, m = int(parts[0]), int(parts[1])
-            if "p.m." in target_time.lower() and h < 12:
-                h += 12
-            start_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            try:
+                clean_time = target_time.replace("p.m.", "").replace("a.m.", "").replace("pm", "").replace("am", "").strip()
+                parts = clean_time.split(":")
+                h = int(parts[0])
+                m = int(parts[1]) if len(parts) > 1 else 0
+                if ("p.m." in target_time.lower() or "pm" in target_time.lower() or "tarde" in target_time.lower() or "noche" in target_time.lower()) and h < 12:
+                    h += 12
+                start_dt = datetime.datetime(year, month, day, h, m, 0)
+            except Exception as e:
+                logger.warning(f"Error parseando hora '{target_time}': {e}")
+                start_dt = datetime.datetime(year, month, day, h, m, 0) + datetime.timedelta(minutes=1)
         else:
-            start_dt = now + datetime.timedelta(minutes=1)
+            start_dt = datetime.datetime(year, month, day, h, m, 0) + datetime.timedelta(minutes=1)
 
         end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
 
-        # Formatear ISO 8601 con offset local
-        # Asumiendo UTC-5 (Lima/Bogotá) o local
+        # Formatear ISO 8601 con offset de Lima (UTC-5)
         tz_offset = "-05:00"
         start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S") + tz_offset
         end_iso = end_dt.strftime("%Y-%m-%dT%H:%M:%S") + tz_offset
 
+        final_desc = description or (
+            f"🎬 Recordatorio: {title}\n"
+            f"📅 Fecha: {start_dt.strftime('%d/%m/%Y')} a las {start_dt.strftime('%H:%M')} hrs\n"
+            f"✨ Agendado automáticamente por Aura Voice AI. ¡Que tengas un excelente día!"
+        )
+
         event_payload = {
             "summary": title,
-            "description": "Evento creado automáticamente por Aura Voice AI (Pipecat Hexagonal Agent).",
+            "description": final_desc,
             "start": {
                 "dateTime": start_iso,
                 "timeZone": "America/Lima"
@@ -198,6 +224,9 @@ class GoogleCalendarClient:
                 "timeZone": "America/Lima"
             }
         }
+
+        if location:
+            event_payload["location"] = location
 
         api_url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
         data_bytes = json.dumps(event_payload).encode("utf-8")

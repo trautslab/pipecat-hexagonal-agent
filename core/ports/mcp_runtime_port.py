@@ -18,6 +18,13 @@ class MCPRuntimePort(ABC):
         pass
 
     @abstractmethod
-    def create_calendar_event(self, title: str = "Hello World", target_time: Optional[str] = None, date: Optional[str] = None) -> Dict[str, Any]:
-        """Crea un evento de calendario con parámetros específicos de hora y título."""
+    def create_calendar_event(
+        self,
+        title: str = "Hello World",
+        target_time: Optional[str] = None,
+        date: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Crea un evento de calendario con parámetros específicos de hora, título, fecha, descripción y ubicación."""
         pass
