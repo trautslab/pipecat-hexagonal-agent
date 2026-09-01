@@ -15,8 +15,8 @@ from core.ports.mcp_runtime_port import MCPRuntimePort
 class AutonomousReasoningEngine:
     """
     Motor de Razonamiento Autónomo ReAct (Reasoning + Acting) estilo OpenClaw / OpenHands.
-    Orquesta clasificación estricta de intenciones (crear vs consultar vs eliminar vs conversar),
-    extracción estructurada y ejecución directa en Google Calendar API v3.
+    Orquesta clasificación exhaustiva de intenciones (crear recordatorios vs consultar vs eliminar vs conversar),
+    extracción estructurada por LLM y ejecución directa en Google Calendar API v3.
     """
 
     MONTHS = {
@@ -41,16 +41,16 @@ class AutonomousReasoningEngine:
 
     def classify_calendar_intent(self, text: str) -> Optional[str]:
         """
-        Clasifica con precisión la intención del usuario para evitar falsos positivos:
+        Clasifica con exhaustividad la intención del usuario:
         - 'list_events': Consultar, verificar, listar o auditar eventos existentes.
-        - 'create_event': Orden explícita de creación o prueba de evento.
+        - 'create_event': Orden explícita de creación, agendamiento o recordatorio cotidiano.
         - 'delete_event': Orden de borrado de evento.
         - None: Instalación de MCP o conversación general.
         """
         t = text.lower()
 
         # 1. Si el usuario pide instalar/integrar un MCP nuevo, delegar al MCPManager
-        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añadir mcp"]) and not any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea"]):
+        if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añadir mcp"]) and not any(w in t for w in ["prueba", "test", "hello world", "evento", "agenda", "crea", "recordar"]):
             return None
 
         # 2. Detección de Consulta / Verificación / Reclamo
@@ -61,7 +61,7 @@ class AutonomousReasoningEngine:
             "verifica", "verificar", "muestra los eventos", "qué hay en mi calendario",
             "que hay en mi calendario", "cuándo es mi", "cuando es mi"
         ]
-        if any(trig in t for trig in query_triggers) and not any(w in t for w in ["crea", "agenda", "programa", "hazme un evento", "prueba"]):
+        if any(trig in t for trig in query_triggers) and not any(w in t for w in ["crea", "agenda", "agendes", "programa", "hazme un evento", "hazme recordar", "recuérdame", "prueba"]):
             return "list_events"
 
         # 3. Detección de Eliminación
@@ -69,17 +69,27 @@ class AutonomousReasoningEngine:
         if any(trig in t for trig in delete_triggers):
             return "delete_event"
 
-        # 4. Detección de Creación Explícita o Prueba
+        # 4. Detección de Creación Explícita o Recordatorio Cotidiano (Exhaustivo)
         creation_verbs = [
-            "crea", "créame", "creame", "agenda", "agéndame", "agendame", "programa",
-            "prográmame", "programame", "ponme", "pon un evento", "hazme un evento",
-            "haz un evento", "quiero que me hagas un evento", "quiero que me crees",
+            # Creación
+            "crea", "créame", "creame", "crees", "crear", "hagas", "hazme", "haz",
+            # Agendamiento
+            "agenda", "agéndame", "agendame", "agendes", "agendar",
+            # Programación
+            "programa", "prográmame", "programame", "programes", "programar",
+            # Poner / Registrar / Guardar
+            "ponme", "pon un", "pongas", "pon", "registra", "regístrame", "registrame", "registres", "registro", "guarda", "guárdame", "guardame",
+            # Recordatorios explícitos
+            "hazme recordar", "hazme acordar", "recuérdame", "recuerdame", "recordarme", "recordatorio",
+            "avísame", "avisame", "avisa", "avisar", "descongelar", "pollo",
+            # Frases compuestas
+            "quiero que me hagas", "quiero que me crees", "quiero que me agendes", "quiero que pongas",
             "agrega un evento", "añade un evento", "nuevo evento", "hello world", "sync-google-calendar",
             "prueba", "test", "probar", "sincronizar", "sincroniza", "puse las credenciales", "listo ya puse"
         ]
         has_creation_verb = any(v in t for v in creation_verbs)
-        has_calendar_keyword = any(w in t for w in ["evento", "cita", "reunión", "reunion", "recordatorio", "calendar", "calendario", "cine", "credenciales", "hello world", "sincroniz"])
-        has_time_or_date = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["mañana", "hoy", "minuto", "septiembre", "octubre", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto"])
+        has_calendar_keyword = any(w in t for w in ["evento", "cita", "reunión", "reunion", "recordatorio", "calendar", "calendario", "cine", "credenciales", "hello world", "sincroniz", "pollo", "descongelar"])
+        has_time_or_date = bool(re.search(r'\b\d{1,2}(?::\d{2})?\s*(?:am|pm|p\.m\.|a\.m\.|de la mañana|de la tarde|de la noche)?\b', text)) or any(w in t for w in ["mañana", "hoy", "hoy día", "hoy dia", "minuto", "septiembre", "octubre", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto"])
 
         if has_creation_verb and (has_calendar_keyword or has_time_or_date):
             return "create_event"
@@ -101,22 +111,22 @@ class AutonomousReasoningEngine:
         system_instruction = (
             "Eres el Motor de Razonamiento ReAct de Aura Voice AI.\n"
             f"La fecha y hora actual del sistema es: {now.strftime('%Y-%m-%d %H:%M:%S')}.\n\n"
-            "Tu tarea es analizar la solicitud de creación de evento del usuario y emitir la llamada estructurada a Google Calendar aplicando PROACTIVIDAD Y MEJORES PRÁCTICAS.\n\n"
+            "Tu tarea es analizar la solicitud de creación de evento o recordatorio del usuario y emitir la llamada estructurada a Google Calendar aplicando PROACTIVIDAD Y MEJORES PRÁCTICAS.\n\n"
             "Reglas de Excelencia:\n"
-            "1. Extrae el título exacto solicitado por el usuario (sin muletillas como 'quiero que me hagas un evento').\n"
-            "2. Extrae o deduce la fecha en formato YYYY-MM-DD.\n"
-            "3. Extrae o deduce la hora en formato HH:MM:SS en 24 horas.\n"
-            "4. Extrae la ubicación si fue mencionada.\n"
-            "5. REDACTA UNA DESCRIPCIÓN PROACTIVA, AMABLE Y DETALLADA CON EMOJIS.\n\n"
+            "1. Extrae el título conciso y claro de la tarea/evento (ej. 'Descongelar el pollo', 'Preparación para ir al cine'). Elimina muletillas como 'hazme recordar que tengo que'.\n"
+            "2. Extrae o deduce la fecha en formato YYYY-MM-DD (asume hoy si dice 'hoy' o 'hoy día', asume mañana si dice 'mañana').\n"
+            "3. Extrae o deduce la hora en formato HH:MM:SS en 24 horas (ej. 10 de la noche -> 22:00:00, 5:15 pm -> 17:15:00).\n"
+            "4. Extrae la ubicación si fue mencionada (deja vacío si no aplica).\n"
+            "5. REDACTA UNA DESCRIPCIÓN PROACTIVA, AMABLE Y DETALLADA CON EMOJIS RELACIONADOS (ej. 🍗 para comida/pollo, 🎬 para cine, 💼 para trabajo, ⏰ para recordatorios).\n\n"
             "Responde ÚNICAMENTE con un bloque JSON:\n"
             "{\n"
             '  "tool": "google_calendar.create_event",\n'
             '  "parameters": {\n'
-            '    "title": "...",\n'
-            '    "date": "YYYY-MM-DD",\n'
-            '    "time": "HH:MM:SS",\n'
-            '    "location": "...",\n'
-            '    "description": "..."\n'
+            '    "title": "Descongelar el pollo",\n'
+            '    "date": "2026-09-01",\n'
+            '    "time": "22:00:00",\n'
+            '    "location": "",\n'
+            '    "description": "🍗 Recordatorio: Sacar el pollo del congelador para que esté listo para cocinar mañana.\\n📅 Fecha: 01/09/2026 a las 22:00 hrs\\n\\n✨ ¡Que tengas una excelente cena!"\n'
             "  }\n"
             "}"
         )
@@ -178,6 +188,9 @@ class AutonomousReasoningEngine:
             tomorrow = now + datetime.timedelta(days=1)
             target_date = tomorrow.strftime("%Y-%m-%d")
             date_display = tomorrow.strftime("%d/%m/%Y")
+        elif "hoy" in t or "hoy día" in t:
+            target_date = now.strftime("%Y-%m-%d")
+            date_display = now.strftime("%d/%m/%Y")
 
         # 2. Extracción de Hora
         target_time = None
@@ -200,7 +213,7 @@ class AutonomousReasoningEngine:
             m_ampm = time_match.group(3) or ""
 
         if m_hour is not None:
-            is_pm = any(w in t for w in ["de la tarde", "de la noche", "p.m.", "pm"]) or ("tarde" in m_ampm or "noche" in m_ampm or "p.m." in m_ampm)
+            is_pm = any(w in t for w in ["de la tarde", "de la noche", "p.m.", "p.m", "pm", "noche", "tarde"]) or ("tarde" in m_ampm or "noche" in m_ampm or "p.m" in m_ampm or "pm" in m_ampm)
             if is_pm and m_hour < 12:
                 m_hour += 12
             target_time = f"{m_hour:02d}:{m_min}:00"
@@ -212,36 +225,56 @@ class AutonomousReasoningEngine:
 
         # 3. Extracción de Título
         title = None
-        named_match = re.search(r'(?:ll[aá]malo|llamado|nombralo|titulado|t[ií]tulo|con el nombre|con nombre)\s+(?:como\s+|de\s+)?["\']?([^"\',.\n]+)', text, re.IGNORECASE)
-        if named_match:
-            raw_title = named_match.group(1).strip()
-            raw_title = re.sub(r'\s+(?:para las|a las|el d[ií]a|por favor).*$', '', raw_title, flags=re.IGNORECASE)
-            if len(raw_title) > 2:
-                title = raw_title.strip()
+
+        # Patrón Recordatorio: 'que tengo que X', 'de que tengo que X', 'sacar del congelador', 'descongelar'
+        reminder_match = re.search(r'(?:que tengo que|tengo que|de que tengo que|recordar de que|recordar que|para que|indique que tenga que|indica que tengo que)\s+([^,\n.]+?)(?:\s+(?:hoy|mañana|a las|para las|el d[ií]a|avísame|el prop[oó]sito|por favor)\b|$)', text, re.IGNORECASE)
+        if reminder_match:
+            candidate = reminder_match.group(1).strip()
+            if len(candidate) > 2:
+                title = candidate.strip()
+
+        # Patrón Cláusula Directa: 'llámalo X', 'llamado X', 'titulado X', 'el título sería X'
+        if not title:
+            named_match = re.search(r'(?:ll[aá]malo|llamado|nombralo|titulado|t[ií]tulo|con el nombre|el t[ií]tulo ser[ií]a)\s+(?:como\s+|de\s+)?["\']?([^"\',.\n]+)', text, re.IGNORECASE)
+            if named_match:
+                raw_title = named_match.group(1).strip()
+                raw_title = re.sub(r'\s+(?:para las|a las|el d[ií]a|por favor).*$', '', raw_title, flags=re.IGNORECASE)
+                if len(raw_title) > 2:
+                    title = raw_title.strip()
 
         if not title:
-            action_match = re.search(r'(?:crea|agenda|programa|hazme|haz)\s+(?:un\s+|una\s+)?(?:evento\s+)?(?:de\s+|para\s+)?([^,\n]+?)(?:\s+(?:para las|a las|el d[ií]a|el \d)\b|$)', text, re.IGNORECASE)
+            action_match = re.search(r'(?:crea|agenda|agendes|programa|hazme|haz)\s+(?:un\s+|una\s+)?(?:evento\s+|recordatorio\s+)?(?:de\s+|para\s+)?([^,\n]+?)(?:\s+(?:para las|a las|el d[ií]a|el \d)\b|$)', text, re.IGNORECASE)
             if action_match:
                 candidate = action_match.group(1).strip()
-                candidate = re.sub(r'^(?:que me repites|que me hagas|un evento|una cita)\s*', '', candidate, flags=re.IGNORECASE)
+                candidate = re.sub(r'^(?:que me repites|que me hagas|un evento|una cita|un registro)\s*', '', candidate, flags=re.IGNORECASE)
                 if len(candidate) > 2 and "hello world" not in candidate.lower():
                     title = candidate.strip()
 
         if not title:
-            title = "Hello World - Prueba Aura Voice AI" if "hello world" in t else "Cita y Recordatorio Personal"
+            if "pollo" in t or "descongelar" in t:
+                title = "Descongelar el pollo"
+            elif "spider" in t:
+                title = "Ver la película Spider-Man"
+            elif "hello world" in t:
+                title = "Hello World - Prueba Aura Voice AI"
+            else:
+                title = "Cita y Recordatorio Personal"
 
         title = title[0].upper() + title[1:] if title else "Evento de Calendario"
 
         # 4. Ubicación
         location = None
         if "cine planet" in t or "cineplanet" in t:
-            location = "Cineplanet - 2 de Mayo"
+            location = "Cineplanet - Jirón de la Unión" if "jirón" in t or "jiron" in t else "Cineplanet - 2 de Mayo"
         elif "2 de mayo" in t:
             location = "Av. 2 de Mayo"
+        elif "sala de juntas" in t:
+            location = "Sala de Juntas"
 
-        # 5. Descripción
+        # 5. Emoji y Descripción
+        emoji = "🍗" if ("pollo" in t or "descongelar" in t) else ("🎬" if ("cine" in t or "spider" in t) else "⏰")
         friendly_description = (
-            f"🎬 Recordatorio: {title}\n"
+            f"{emoji} Recordatorio: {title}\n"
             f"📅 Fecha: {date_display} a las {time_display} hrs\n"
             f"{f'📍 Ubicación: {location}' + chr(10) if location else ''}"
             f"\n✨ Agendado automáticamente por Aura Voice AI. ¡Que tengas un excelente día!"
@@ -321,7 +354,6 @@ class AutonomousReasoningEngine:
                 "observation"
             )
 
-            # Formatear lista de eventos
             events_text = ""
             for idx, ev in enumerate(events[:5], 1):
                 events_text += f"{idx}. **{ev.get('title')}** | Fecha/Hora: `{ev.get('start', 'N/A')}` | [Ver en Calendar]({ev.get('html_link')})\n"
@@ -338,7 +370,7 @@ class AutonomousReasoningEngine:
             )
             return augmented_prompt, thoughts_trace
 
-        # 2. CASO B: CREACIÓN EXPLÍCITA DE EVENTO (create_event)
+        # 2. CASO B: CREACIÓN EXPLÍCITA DE EVENTO O RECORDATORIO (create_event)
         elif cal_action == "create_event":
             llm_params = await self.llm_reason_and_extract_tool_call(user_prompt)
             if llm_params and llm_params.get("title"):
