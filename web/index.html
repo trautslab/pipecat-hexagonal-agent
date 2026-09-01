@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura | Agente de Voz Pipecat (Arquitectura Hexagonal)</title>
+  <meta name="description" content="Interfaz web conversacional en tiempo real con visualizador de ondas y arquitectura hexagonal desacoplada.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">🎙️</div>
+        <div>
+          <h1>Aura Voice AI</h1>
+          <span class="subtitle">Pipecat Hexagonal Agent • Zero-Cost Stack</span>
+        </div>
+      </div>
+      
+      <div class="status-badge" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">DESCONECTADO</span>
+      </div>
+    </header>
+
+    <!-- Architecture & Providers Bar -->
+    <section class="providers-bar">
+      <div class="provider-pill">
+        <span class="pill-label">STT</span>
+        <span class="pill-value" id="stt-val">Faster-Whisper (Local $0)</span>
+      </div>
+      <div class="provider-pill">
+        <span class="pill-label">LLM</span>
+        <span class="pill-value" id="llm-val">Ollama (Llama 3.2)</span>
+      </div>
+      <div class="provider-pill">
+        <span class="pill-label">TTS</span>
+        <span class="pill-value" id="tts-val">Piper TTS (Local $0)</span>
+      </div>
+      <div class="provider-pill">
+        <span class="pill-label">Transporte</span>
+        <span class="pill-value" id="transport-val">WebSocket PCM 16kHz</span>
+      </div>
+    </section>
+
+    <!-- Main Visualizer Area -->
+    <main class="visualizer-container">
+      <div class="waveform-wrapper">
+        <canvas id="waveform-canvas" width="800" height="220"></canvas>
+        <div class="visualizer-overlay" id="visualizer-overlay">
+          <span>Pulsa el botón para activar el micrófono y hablar</span>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="action-wrapper">
+        <button id="toggle-mic-btn" class="mic-button idle" aria-label="Iniciar Conversación">
+          <div class="btn-ripple"></div>
+          <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2a1 1 0 0 0-2 0v2a9 9 0 0 0 8 8.945V22a1 1 0 0 0 2 0v-1.055A9 9 0 0 0 21 12v-2a1 1 0 0 0-2 0Z"/>
+          </svg>
+          <span id="btn-text">INICIAR CONVERSACIÓN</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- Live Captions / Transcription Stream -->
+    <section class="chat-stream-section">
+      <div class="stream-header">
+        <h2>Subtítulos y Transcripción en Vivo</h2>
+        <span class="badge-live">STREAMING</span>
+      </div>
+      <div class="captions-box" id="captions-box">
+        <div class="caption-item bot-msg">
+          <span class="avatar">🤖 Aura:</span>
+          <p>¡Hola! Soy tu asistente de voz. Haz clic en el botón para hablar conmigo por tu micrófono.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Desarrollado bajo <a href="https://github.com/trautslab/ai-sdlc-framework" target="_blank">AI-SDLC Framework</a> • <a href="https://github.com/trautslab/pipecat-hexagonal-agent" target="_blank">GitHub Repository</a></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
