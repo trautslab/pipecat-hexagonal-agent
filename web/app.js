@@ -1,7 +1,8 @@
 /**
- * Aura Voice AI - Web Client v0.7.0
- * Soporte para Inspector Desplegable de Acciones y Telemetría Completa (OpenClaw style),
- * Botón de Copiado de Registros Técnicos, Historial Persistente y Streaming WebSocket.
+ * Aura Voice AI - Web Client v0.8.0
+ * Soporte para Consola Lateral Derecha de Trazabilidad en Tiempo Real (Right Sidebar),
+ * Numeración Correlativa por Turno (#1, #2, ...), Botón de Copiado de Consola Completa
+ * y Streaming de Pasos ReAct / MCP en Vivo.
  */
 
 class VoiceAgentApp {
@@ -19,6 +20,7 @@ class VoiceAgentApp {
     // Sessions & Chat State
     this.sessions = [];
     this.currentSessionId = null;
+    this.activeTurnCounter = 0;
 
     // DOM Elements
     this.themeToggleBtn = document.getElementById("theme-toggle-btn");
@@ -28,6 +30,14 @@ class VoiceAgentApp {
     this.newChatBtn = document.getElementById("new-chat-btn");
     this.historyList = document.getElementById("history-list");
     this.currentChatTitle = document.getElementById("current-chat-title");
+
+    // Right Console Sidebar DOM Elements
+    this.toggleConsoleBtn = document.getElementById("toggle-console-btn");
+    this.rightConsoleSidebar = document.getElementById("right-console-sidebar");
+    this.closeConsoleBtn = document.getElementById("close-console-btn");
+    this.copyConsoleBtn = document.getElementById("copy-console-btn");
+    this.consoleEmptyState = document.getElementById("console-empty-state");
+    this.consoleTurnsContainer = document.getElementById("console-turns-container");
 
     this.toggleMicBtn = document.getElementById("toggle-mic-btn");
     this.btnText = document.getElementById("btn-text");
@@ -105,18 +115,22 @@ class VoiceAgentApp {
       id: newId,
       title: "Nueva Conversación",
       createdAt: new Date().toISOString(),
+      turnCounter: 1,
       messages: [
         {
           role: "bot",
-          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con un motor de razonamiento autónomo (ReAct) para investigar en internet y autoinstalarme herramientas MCP (como Google Calendar o bases de datos). Cada acción queda registrada en el desplegable de telemetría. ¿Qué deseas consultar hoy?",
+          turnIndex: 1,
+          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con motor de razonamiento autónomo (ReAct) y gestor dinámico de MCPs. Puedes observar todas mis acciones en tiempo real en la consola derecha. ¿Qué deseas consultar o construir hoy?",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           telemetry: null
         }
-      ]
+      ],
+      consoleLogs: []
     };
 
     this.sessions.unshift(newSession);
     this.currentSessionId = newId;
+    this.activeTurnCounter = 1;
     this.saveSessions();
 
     if (render) {
@@ -130,13 +144,18 @@ class VoiceAgentApp {
 
     this.currentSessionId = sessionId;
     this.currentChatTitle.textContent = session.title;
+    this.activeTurnCounter = session.turnCounter || session.messages.length;
     localStorage.setItem("aura_active_session", sessionId);
 
+    // 1. Renderizar mensajes en el chat
     this.captionsStream.innerHTML = "";
     session.messages.forEach(m => {
-      this.renderMessageBubble(m.role, m.text, m.time, false, m.telemetry);
+      this.renderMessageBubble(m.role, m.text, m.time, false, m.turnIndex);
     });
     this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
+
+    // 2. Renderizar historial de consola derecha
+    this.renderConsoleHistory(session);
 
     this.renderSidebarHistory();
   }
@@ -180,8 +199,12 @@ class VoiceAgentApp {
     const session = this.sessions.find(s => s.id === this.currentSessionId);
     if (!session) return;
 
+    if (!session.turnCounter) session.turnCounter = session.messages.length;
+    session.turnCounter += 1;
+    const turnIndex = session.turnCounter;
+
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    session.messages.push({ role, text, time, telemetry });
+    session.messages.push({ role, text, time, turnIndex, telemetry });
 
     if (role === "user" && (session.title === "Nueva Conversación" || session.title.startsWith("Conversación"))) {
       session.title = text.length > 28 ? text.substring(0, 28) + "..." : text;
@@ -189,59 +212,25 @@ class VoiceAgentApp {
     }
 
     this.saveSessions();
-    this.renderMessageBubble(role, text, time, true, telemetry);
+    this.renderMessageBubble(role, text, time, true, turnIndex);
+    return turnIndex;
   }
 
   /* ============================================================================
-     3. RENDER MESSAGE BUBBLE WITH ACTION INSPECTOR DROPDOWN
+     3. RENDER MESSAGE BUBBLE IN CHAT (Correlative Turn Badge & Copy)
      ============================================================================ */
-  renderMessageBubble(role, text, time, autoScroll = true, telemetry = null) {
+  renderMessageBubble(role, text, time, autoScroll = true, turnIndex = null) {
     const bubble = document.createElement("div");
     bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
 
-    let inspectorHtml = "";
-    if (telemetry && (telemetry.steps && telemetry.steps.length > 0 || telemetry.duration_ms)) {
-      const stepsCount = telemetry.steps ? telemetry.steps.length : 0;
-      const stepsListHtml = (telemetry.steps || []).map(step => {
-        let icon = "🧠";
-        if (step.kind === "action") icon = "⚙️";
-        if (step.kind === "observation") icon = "✅";
-        return `
-          <div class="telemetry-step">
-            <span>${icon}</span>
-            <div><strong>${step.title}:</strong> ${step.detail}</div>
-          </div>
-        `;
-      }).join("");
-
-      const filesHtml = (telemetry.files_affected && telemetry.files_affected.length > 0)
-        ? `<div>📁 <strong>Archivos modificados:</strong> ${telemetry.files_affected.map(f => `<code>${f}</code>`).join(", ")}</div>`
-        : "";
-
-      inspectorHtml = `
-        <details class="action-inspector" open>
-          <summary>
-            <span>⚡ Acciones y Telemetría (${stepsCount} eventos • ${telemetry.duration_ms || 0}ms)</span>
-            <button class="copy-telemetry-btn" title="Copiar registro de acciones al portapapeles">
-              <span>📋</span> Copiar Registro
-            </button>
-          </summary>
-          <div class="inspector-body">
-            <div class="telemetry-meta">
-              <span>⏱️ Latencia: <strong>${telemetry.duration_ms || 0}ms</strong></span>
-              <span>🤖 Modelo: <strong>${telemetry.model || "Llama 3.1 8B"}</strong></span>
-              <span>🕒 Hora: <strong>${telemetry.timestamp || time}</strong></span>
-            </div>
-            ${stepsListHtml}
-            ${filesHtml}
-          </div>
-        </details>
-      `;
-    }
+    const turnNum = turnIndex ? `#${turnIndex}` : "";
 
     bubble.innerHTML = `
       <div class="bubble-header">
-        <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
+        <div class="bubble-title-group">
+          ${turnNum ? `<span class="turn-badge ${role}">${turnNum}</span>` : ""}
+          <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
+        </div>
         <div class="bubble-actions">
           <span class="bubble-time">${time || "Ahora"}</span>
           <button class="copy-msg-btn" title="Copiar mensaje">
@@ -249,23 +238,11 @@ class VoiceAgentApp {
           </button>
         </div>
       </div>
-      ${inspectorHtml}
       <div class="bubble-text">${this.formatText(text)}</div>
     `;
 
     const copyBtn = bubble.querySelector(".copy-msg-btn");
     copyBtn.onclick = () => this.copyToClipboard(text, copyBtn);
-
-    if (telemetry) {
-      const copyTelemBtn = bubble.querySelector(".copy-telemetry-btn");
-      if (copyTelemBtn) {
-        copyTelemBtn.onclick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this.copyTelemetryToClipboard(telemetry, copyTelemBtn);
-        };
-      }
-    }
 
     this.captionsStream.appendChild(bubble);
     if (autoScroll) {
@@ -303,36 +280,189 @@ class VoiceAgentApp {
     }
   }
 
-  copyTelemetryToClipboard(telemetry, btnElement) {
-    let md = `### ⚡ Registro de Acciones y Telemetría Aura\n`;
-    md += `- **Timestamp:** ${telemetry.iso_timestamp || telemetry.timestamp}\n`;
-    md += `- **Modelo LLM:** ${telemetry.model || "Llama 3.1 8B"}\n`;
-    md += `- **Latencia Total:** ${telemetry.duration_ms}ms\n`;
-    md += `- **Prompt Usuario:** "${telemetry.user_prompt || ''}"\n\n`;
-    md += `#### 📋 Pasos Ejecutados:\n`;
-    if (telemetry.steps && telemetry.steps.length > 0) {
-      telemetry.steps.forEach((s, idx) => {
-        md += `${idx + 1}. **[${s.kind ? s.kind.toUpperCase() : 'STEP'}] ${s.title}:** ${s.detail}\n`;
-      });
-    } else {
-      md += `(Respuesta conversacional directa)\n`;
+  /* ============================================================================
+     4. RIGHT CONSOLE SIDEBAR: REAL-TIME STREAMING & TURNS
+     ============================================================================ */
+  renderConsoleHistory(session) {
+    this.consoleTurnsContainer.innerHTML = "";
+    const logs = session.consoleLogs || [];
+
+    if (logs.length === 0) {
+      this.consoleEmptyState.classList.remove("hidden");
+      return;
     }
-    if (telemetry.files_affected && telemetry.files_affected.length > 0) {
-      md += `\n#### 📁 Archivos Afectados:\n`;
-      telemetry.files_affected.forEach(f => {
-        md += `- \`${f}\`\n`;
+
+    this.consoleEmptyState.classList.add("hidden");
+    logs.forEach(turnData => {
+      this.renderTurnCardInConsole(turnData, false);
+    });
+    this.consoleTurnsContainer.scrollTop = this.consoleTurnsContainer.scrollHeight;
+  }
+
+  renderTurnCardInConsole(turnData, isOpen = true) {
+    this.consoleEmptyState.classList.add("hidden");
+
+    let card = document.getElementById(`turn-card-${turnData.turnIndex}`);
+    if (!card) {
+      card = document.createElement("details");
+      card.id = `turn-card-${turnData.turnIndex}`;
+      card.className = "console-turn-card active";
+      if (isOpen) card.setAttribute("open", "");
+
+      card.innerHTML = `
+        <summary>
+          <span>⚡ Turno #${turnData.turnIndex}</span>
+          <span class="turn-tag-live" id="turn-tag-${turnData.turnIndex}">● Procesando en vivo...</span>
+        </summary>
+        <div class="console-turn-body" id="turn-body-${turnData.turnIndex}">
+          <div class="console-turn-prompt">💬 <strong>Prompt:</strong> "${turnData.userPrompt || ''}"</div>
+          <div class="console-steps-list" id="turn-steps-${turnData.turnIndex}"></div>
+        </div>
+      `;
+      this.consoleTurnsContainer.appendChild(card);
+    }
+
+    const stepsList = card.querySelector(`#turn-steps-${turnData.turnIndex}`);
+    if (stepsList && turnData.steps) {
+      stepsList.innerHTML = "";
+      turnData.steps.forEach(step => {
+        let icon = "🧠";
+        if (step.kind === "action") icon = "⚙️";
+        if (step.kind === "observation") icon = "✅";
+
+        const item = document.createElement("div");
+        item.className = "console-step-item";
+        item.innerHTML = `
+          <span class="console-step-icon">${icon}</span>
+          <div class="console-step-text">
+            <strong>${step.title}:</strong> ${step.detail}
+            ${step.timestamp ? `<div class="console-step-meta">[${step.timestamp}]</div>` : ''}
+          </div>
+        `;
+        stepsList.appendChild(item);
       });
     }
 
-    this.copyToClipboard(md, btnElement);
+    this.consoleTurnsContainer.scrollTop = this.consoleTurnsContainer.scrollHeight;
+  }
+
+  handleLiveTraceStep(turnIndex, step, timestamp, elapsedMs) {
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    if (!session) return;
+
+    if (!session.consoleLogs) session.consoleLogs = [];
+    let turnEntry = session.consoleLogs.find(t => t.turnIndex === turnIndex);
+    if (!turnEntry) {
+      turnEntry = {
+        turnIndex: turnIndex,
+        timestamp: timestamp || new Date().toLocaleTimeString(),
+        steps: [],
+        status: "processing"
+      };
+      session.consoleLogs.push(turnEntry);
+    }
+
+    step.timestamp = timestamp;
+    turnEntry.steps.push(step);
+    this.saveSessions();
+
+    this.renderTurnCardInConsole(turnEntry, true);
+  }
+
+  finalizeTurnInConsole(turnIndex, telemetry) {
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    if (!session) return;
+
+    if (!session.consoleLogs) session.consoleLogs = [];
+    let turnEntry = session.consoleLogs.find(t => t.turnIndex === turnIndex);
+    if (!turnEntry) {
+      turnEntry = {
+        turnIndex: turnIndex,
+        timestamp: telemetry ? telemetry.timestamp : new Date().toLocaleTimeString(),
+        steps: telemetry ? telemetry.steps : [],
+        duration_ms: telemetry ? telemetry.duration_ms : 0
+      };
+      session.consoleLogs.push(turnEntry);
+    } else if (telemetry) {
+      turnEntry.duration_ms = telemetry.duration_ms;
+      turnEntry.model = telemetry.model;
+      turnEntry.files_affected = telemetry.files_affected;
+    }
+
+    turnEntry.status = "done";
+    this.saveSessions();
+
+    const tag = document.getElementById(`turn-tag-${turnIndex}`);
+    if (tag) {
+      tag.className = "turn-tag-live done";
+      tag.textContent = `✓ Completado (${turnEntry.duration_ms || 0}ms)`;
+    }
+
+    const card = document.getElementById(`turn-card-${turnIndex}`);
+    if (card) {
+      card.classList.remove("active");
+      const body = card.querySelector(".console-turn-body");
+      if (body && !body.querySelector(".console-turn-meta-footer")) {
+        const metaFooter = document.createElement("div");
+        metaFooter.className = "console-turn-meta-footer";
+        metaFooter.innerHTML = `
+          <span>⏱️ Latencia: <strong>${turnEntry.duration_ms || 0}ms</strong></span>
+          <span>🤖 Modelo: <strong>${turnEntry.model || "Llama 3.1 8B"}</strong></span>
+        `;
+        body.appendChild(metaFooter);
+      }
+    }
+  }
+
+  copyConsoleToClipboard() {
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    if (!session || !session.consoleLogs || session.consoleLogs.length === 0) {
+      alert("No hay registros de trazabilidad en la sesión activa.");
+      return;
+    }
+
+    let md = `# ⚡ Consola de Trazabilidad Aura - Conversación: "${session.title}"\n`;
+    md += `- **ID de Sesión:** \`${session.id}\`\n`;
+    md += `- **Fecha:** ${session.createdAt}\n\n`;
+
+    session.consoleLogs.forEach(turn => {
+      md += `## 🔹 Turno #${turn.turnIndex} (${turn.timestamp})\n`;
+      if (turn.userPrompt) md += `**Prompt Usuario:** "${turn.userPrompt}"\n\n`;
+      md += `### 📋 Pasos ReAct Ejecutados:\n`;
+      (turn.steps || []).forEach((s, idx) => {
+        md += `${idx + 1}. **[${(s.kind || 'THOUGHT').toUpperCase()}] ${s.title}:** ${s.detail}\n`;
+      });
+      if (turn.duration_ms) md += `\n- **Latencia Total:** ${turn.duration_ms}ms\n`;
+      if (turn.model) md += `- **Modelo:** ${turn.model}\n`;
+      if (turn.files_affected && turn.files_affected.length > 0) {
+        md += `- **Archivos Modificados:** ${turn.files_affected.join(", ")}\n`;
+      }
+      md += `\n---\n\n`;
+    });
+
+    this.copyToClipboard(md, this.copyConsoleBtn);
   }
 
   /* ============================================================================
-     4. EVENT LISTENERS
+     5. EVENT LISTENERS
      ============================================================================ */
   initEvents() {
     this.toggleSidebarBtn.addEventListener("click", () => {
       this.sidebar.classList.toggle("collapsed");
+    });
+
+    this.toggleConsoleBtn.addEventListener("click", () => {
+      this.rightConsoleSidebar.classList.toggle("collapsed");
+      this.toggleConsoleBtn.classList.toggle("active", !this.rightConsoleSidebar.classList.contains("collapsed"));
+    });
+
+    this.closeConsoleBtn.addEventListener("click", () => {
+      this.rightConsoleSidebar.classList.add("collapsed");
+      this.toggleConsoleBtn.classList.remove("active");
+    });
+
+    this.copyConsoleBtn.addEventListener("click", () => {
+      this.copyConsoleToClipboard();
     });
 
     this.newChatBtn.addEventListener("click", () => {
@@ -353,9 +483,13 @@ class VoiceAgentApp {
       const session = this.sessions.find(s => s.id === this.currentSessionId);
       if (session) {
         session.messages = [];
+        session.consoleLogs = [];
+        session.turnCounter = 0;
         this.saveSessions();
       }
       this.captionsStream.innerHTML = "";
+      this.consoleTurnsContainer.innerHTML = "";
+      this.consoleEmptyState.classList.remove("hidden");
     });
 
     window.addEventListener("resize", () => this.resizeCanvas());
@@ -373,7 +507,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     5. SPEECH SYNTHESIS & RECOGNITION
+     6. SPEECH SYNTHESIS & RECOGNITION
      ============================================================================ */
   speakText(text) {
     if (!('speechSynthesis' in window)) return;
@@ -479,13 +613,14 @@ class VoiceAgentApp {
       
       if (transcript.length > 0) {
         console.log("🗣️ Transcripción detectada:", transcript);
-        this.addMessageToCurrentSession("user", transcript);
+        const userTurn = this.addMessageToCurrentSession("user", transcript);
 
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
           const session = this.sessions.find(s => s.id === this.currentSessionId);
           this.socket.send(JSON.stringify({
             type: "user_transcription",
             sessionId: this.currentSessionId,
+            turnIndex: userTurn,
             history: session ? session.messages.slice(-6) : [],
             text: transcript
           }));
@@ -519,7 +654,7 @@ class VoiceAgentApp {
     this.socket.binaryType = "arraybuffer";
 
     this.socket.onopen = () => {
-      console.log("✅ WebSocket conectado con ReAct Engine.");
+      console.log("✅ WebSocket conectado con ReAct Live Streaming Console.");
       this.setStatus("connected", "Escuchando");
     };
 
@@ -528,13 +663,27 @@ class VoiceAgentApp {
         try {
           const msg = JSON.parse(event.data);
           
-          if (msg.type === "thought") {
-            if (msg.step && msg.step.title) {
-              this.setStatus("listening", msg.step.title);
+          if (msg.type === "turn_start") {
+            const session = this.sessions.find(s => s.id === this.currentSessionId);
+            if (session) {
+              if (!session.consoleLogs) session.consoleLogs = [];
+              const newTurn = {
+                turnIndex: msg.turnIndex,
+                timestamp: msg.timestamp,
+                userPrompt: msg.userPrompt,
+                steps: [],
+                status: "processing"
+              };
+              session.consoleLogs.push(newTurn);
+              this.saveSessions();
+              this.renderTurnCardInConsole(newTurn, true);
             }
+          } else if (msg.type === "live_trace_step") {
+            this.handleLiveTraceStep(msg.turnIndex, msg.step, msg.timestamp, msg.elapsed_ms);
           } else if (msg.type === "caption") {
             if (msg.text) {
-              this.addMessageToCurrentSession(msg.role || "bot", msg.text, msg.telemetry || null);
+              const botTurn = this.addMessageToCurrentSession(msg.role || "bot", msg.text, msg.telemetry || null);
+              this.finalizeTurnInConsole(msg.turnIndex, msg.telemetry);
               if (msg.speak) {
                 this.speakText(msg.text);
               }
@@ -641,7 +790,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     6. CANVAS WAVEFORM ANIMATION
+     7. CANVAS WAVEFORM ANIMATION
      ============================================================================ */
   startActiveWaveform() {
     cancelAnimationFrame(this.animationId);

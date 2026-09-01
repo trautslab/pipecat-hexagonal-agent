@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aura | Agente de Voz & Asistente de Ingeniería</title>
-  <meta name="description" content="Interfaz conversacional por voz y texto con historial de chats estilo ChatGPT/Claude, visualizador reactivo, herramientas MCP y arquitectura hexagonal.">
+  <title>Aura | Agente de Voz & Consola de Trazabilidad en Vivo</title>
+  <meta name="description" content="Interfaz conversacional por voz y texto con consola lateral de trazabilidad en tiempo real, historial de chats estilo ChatGPT/Claude, visualizador reactivo y herramientas MCP.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,11 +15,11 @@
   <div class="ambient-glow glow-top"></div>
   <div class="ambient-glow glow-bottom"></div>
 
-  <!-- Main Layout Container -->
+  <!-- Main Layout Container (3 Columns) -->
   <div class="app-layout">
     
-    <!-- Sidebar de Historial de Conversaciones (ChatGPT / Claude Style) -->
-    <aside class="sidebar" id="sidebar">
+    <!-- 1. LEFT SIDEBAR: Historial de Conversaciones (ChatGPT / Claude Style) -->
+    <aside class="sidebar left-sidebar" id="sidebar">
       <div class="sidebar-header">
         <button id="new-chat-btn" class="new-chat-btn">
           <span class="plus-icon">+</span>
@@ -42,25 +42,30 @@
       </div>
     </aside>
 
-    <!-- Main Workspace Container Card -->
+    <!-- 2. CENTER AREA: Main Workspace Card -->
     <div class="app-card">
       <!-- Header -->
       <header class="app-header">
         <div class="brand">
-          <button id="toggle-sidebar-btn" class="icon-btn sidebar-toggle" title="Alternar barra lateral de historial" aria-label="Historial">
+          <button id="toggle-sidebar-btn" class="icon-btn sidebar-toggle" title="Alternar historial de conversaciones" aria-label="Historial">
             ☰
           </button>
           <div class="brand-badge">🎙️</div>
           <div>
             <div class="title-row">
               <h1>Aura Voice AI</h1>
-              <span class="version-tag">v0.5.0</span>
+              <span class="version-tag">v0.8.0</span>
             </div>
-            <span class="subtitle">Hexagonal Agent • Autonomous MCP Scaffolder</span>
+            <span class="subtitle">Hexagonal Agent • Real-Time ReAct & MCP Telemetry</span>
           </div>
         </div>
         
         <div class="header-actions">
+          <!-- Console Toggle Button -->
+          <button id="toggle-console-btn" class="icon-btn console-toggle active" aria-label="Alternar Consola de Trazabilidad" title="Alternar Consola de Trazabilidad en Vivo">
+            ⚡
+          </button>
+
           <!-- Theme Toggle Button -->
           <button id="theme-toggle-btn" class="icon-btn" aria-label="Cambiar tema" title="Cambiar tema claro/oscuro">
             <span id="theme-icon">🌙</span>
@@ -86,7 +91,7 @@
         </div>
         <div class="provider-card">
           <div class="card-tag">Herramientas</div>
-          <div class="card-val" id="tools-val">WebSearch & MCP Scaffolding</div>
+          <div class="card-val" id="tools-val">WebSearch & MCP Manager</div>
         </div>
         <div class="provider-card">
           <div class="card-tag">Transporte</div>
@@ -132,7 +137,7 @@
         </div>
 
         <div class="captions-stream" id="captions-stream">
-          <!-- Mensajes dinámicos con botón de copiado -->
+          <!-- Mensajes dinámicos con numeración correlativa y botón de copiado -->
         </div>
       </section>
 
@@ -143,6 +148,33 @@
         <span><a href="https://github.com/trautslab/pipecat-hexagonal-agent" target="_blank">GitHub Repository</a></span>
       </footer>
     </div>
+
+    <!-- 3. RIGHT SIDEBAR: Consola de Trazabilidad en Tiempo Real -->
+    <aside class="sidebar right-console-sidebar" id="right-console-sidebar">
+      <div class="console-header">
+        <div class="console-title">
+          <span class="pulse-indicator"></span>
+          <span>Consola de Trazabilidad</span>
+        </div>
+        <div class="console-header-actions">
+          <button id="copy-console-btn" class="copy-console-btn" title="Copiar toda la trazabilidad en Markdown">
+            <span>📋</span> Copiar
+          </button>
+          <button id="close-console-btn" class="console-close-btn" title="Minimizar consola">✕</button>
+        </div>
+      </div>
+
+      <div class="console-body" id="console-body">
+        <div class="console-empty-state" id="console-empty-state">
+          <span>⚡ Esperando actividad...</span>
+          <p>Los pensamientos, llamadas a tools e investigaciones web aparecerán aquí en tiempo real.</p>
+        </div>
+        <div class="console-turns-container" id="console-turns-container">
+          <!-- Acordeones de cada turno correlativo se inyectan en tiempo real -->
+        </div>
+      </div>
+    </aside>
+
   </div>
 
   <script src="app.js"></script>
