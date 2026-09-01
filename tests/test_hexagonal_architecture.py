@@ -1,5 +1,6 @@
 import unittest
 import uuid
+import asyncio
 from config.settings import (
     AppSettings,
     STTProviderType,
@@ -16,6 +17,9 @@ from adapters.mock_adapters import (
     MockTransportAdapter,
 )
 from adapters.transport.websocket_transport_adapter import WebSocketTransportAdapter
+from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+from core.ports.search_port import SearchPort
+from core.services.grounding_service import GroundingService
 from core.services.pipeline_builder import VoiceAgentPipelineBuilder
 
 
@@ -64,6 +68,15 @@ class TestHexagonalArchitecture(unittest.TestCase):
         agent_builder = AgentFactory.build_agent(config)
         self.assertIsInstance(agent_builder.transport, WebSocketTransportAdapter)
         self.assertEqual(agent_builder.transport.provider_name, "WebSocket Streaming (Web Client)")
+
+    def test_search_port_and_grounding_service(self):
+        """Valida el puerto de búsqueda web y el servicio de grounding."""
+        search_adapter = DuckDuckGoSearchAdapter()
+        self.assertIsInstance(search_adapter, SearchPort)
+
+        grounding = GroundingService(search_adapter)
+        self.assertTrue(grounding.should_search("¿Dónde queda la UNI?"))
+        self.assertFalse(grounding.should_search("hola"))
 
     def test_pipeline_assembly_with_ports(self):
         """Valida que el Core Pipeline Builder ensamble la tubería de Pipecat correctamente."""

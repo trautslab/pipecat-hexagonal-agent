@@ -4,6 +4,7 @@ Automated Eval Harness (AI-SDLC Standard)
 Ejecuta bucles de evaluación deterministas para contratos de tareas agénticas.
 """
 import sys
+import asyncio
 import argparse
 from pathlib import Path
 
@@ -106,7 +107,6 @@ def eval_task_004_websocket_transport_and_web_ui() -> bool:
         assert "WebSocket Streaming" in builder.transport.provider_name
         assert isinstance(builder.transport, WebSocketTransportAdapter)
 
-        # Validar existencia de archivos del cliente web
         web_index = ROOT_DIR / "web" / "index.html"
         web_styles = ROOT_DIR / "web" / "styles.css"
         web_app = ROOT_DIR / "web" / "app.js"
@@ -121,9 +121,37 @@ def eval_task_004_websocket_transport_and_web_ui() -> bool:
         return False
 
 
+def eval_task_005_web_search_grounding() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-005: Herramienta de Búsqueda Web y Grounding Factual...")
+    try:
+        from core.ports.search_port import SearchPort
+        from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
+        from core.services.grounding_service import GroundingService
+
+        search_adapter = DuckDuckGoSearchAdapter()
+        assert isinstance(search_adapter, SearchPort), "El adaptador no implementa SearchPort"
+
+        grounding = GroundingService(search_adapter)
+        assert grounding.should_search("¿Dónde queda la Universidad Nacional de Ingeniería?") is True
+        assert grounding.should_search("Hola") is False
+
+        # Probar generación de prompt enriquecido
+        async def _test():
+            prompt = await grounding.get_grounded_prompt("Universidad Nacional de Ingenieria del Peru")
+            assert "[INFORMACIÓN VERIFICADA" in prompt
+            return True
+
+        asyncio.run(_test())
+        print("✅ [EVAL TASK-005] Superada: SearchPort, DuckDuckGo adapter y GroundingService validados.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-005] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001, TASK-002, TASK-003, TASK-004)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-005)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -149,6 +177,11 @@ def main():
         res = eval_task_004_websocket_transport_and_web_ui()
         results["TASK-004"] = res
         log_event("EVALUATION", "TASK-004", "SUCCESS" if res else "FAILED", "Eval Harness executed")
+
+    if args.task == "TASK-005" or args.all or not args.task:
+        res = eval_task_005_web_search_grounding()
+        results["TASK-005"] = res
+        log_event("EVALUATION", "TASK-005", "SUCCESS" if res else "FAILED", "Eval Harness executed")
 
     total = len(results)
     passed = sum(1 for v in results.values() if v)
