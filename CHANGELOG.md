@@ -10,12 +10,20 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.7.0] - 2026-09-01
+
+### Added
+- **Inspector Desplegable de Acciones y Telemetría (`ActionInspector`):** Cada mensaje del asistente ahora incluye un acordeón interactivo (`<details>`) con el desglose cronológico de todas las operaciones ejecutadas (pensamientos ReAct, llamadas a herramientas, queries web, archivos modificados, modelo LLM y latencia en ms).
+- **Botón de Copiado de Registro Técnico (`[📋 Copiar Registro]`):** Permite exportar con un solo clic toda la traza de telemetría formateada en Markdown para reportar feedback o depuración.
+- **Gobernanza AI-SDLC:** Caso de uso `UC-008`, diagrama `SEQ-006`, decisión `ADR-0007` y contrato `TASK-010`.
+
+---
+
 ## [0.6.0] - 2026-09-01
 
 ### Added
 - **Motor de Razonamiento Autónomo ReAct (Estilo OpenClaw / OpenHands):** Implementación de `AutonomousReasoningEngine` en `core/services/` para ejecutar bucles multi-paso (*Thought -> Action -> Observation -> Synthesis*).
 - **Gestor Dinámico de Herramientas MCP (`MCPPort` & `MCPManagerAdapter`):** Permite al agente descubrir paquetes MCP en npm/GitHub, autoinstalar servidores en `.agents/mcp/mcp-servers.json` y declarar variables en `.env` (ej. Google Calendar MCP).
-- **Visualizador de Pensamientos ReAct en la UI:** Renderizado de tarjetas de razonamiento y acciones (*"⚡ Razonamiento Autónomo ReAct"*) en los mensajes de Aura.
 - **Gobernanza AI-SDLC:** Caso de uso `UC-007`, diagrama `SEQ-005`, decisión `ADR-0006` y contratos `TASK-008` / `TASK-009`.
 
 ---
@@ -40,8 +48,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [0.3.0] - 2026-09-01
 
 ### Added
-- **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia en `localStorage` e iconografía fluida (☀️ / 🌙).
-- **Servidor WebSocket RFC 6455 Nativo:** Implementación en `web_server.py` de handshake y framing de WebSocket binario/texto para conexión bidireccional inmediata.
+- **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia en `localStorage`.
+- **Servidor WebSocket RFC 6455 Nativo:** Implementación en `web_server.py` de handshake y framing de WebSocket binario/texto.
 
 ---
 
