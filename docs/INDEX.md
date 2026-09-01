@@ -16,6 +16,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0006`: Motor ReAct y Gestor Autónomo de MCPs estilo OpenClaw](adr/ADR-0006-openclaw-reasoning-and-dynamic-mcp.md)
   - [`ADR-0007`: Desplegable de Telemetría e Inspección de Acciones en la UI](adr/ADR-0007-action-inspector-ui.md)
   - [`ADR-0008`: Consola Lateral Derecha de Trazabilidad en Tiempo Real](adr/ADR-0008-right-sidebar-live-console-architecture.md)
+  - [`ADR-0009`: Ejecución Activa y Verificación de Herramientas MCP](adr/ADR-0009-mcp-tool-execution-client.md)
 
 ---
 
@@ -32,6 +33,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-007`](use-cases/UC-007-openclaw-autonomous-reasoning-mcp.md) | Motor ReAct y Autoinstalación MCP | OpenClaw/Agent | [`SEQ-005`](diagrams/sequences/SEQ-005-react-reasoning-and-mcp-installation.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-008`](../.agents/tasks/TASK-008-autonomous-react-engine.md), [`TASK-009`](../.agents/tasks/TASK-009-dynamic-mcp-manager.md) | `APPROVED` |
 | [`UC-008`](use-cases/UC-008-action-inspector-telemetry.md) | Inspector de Acciones y Telemetría UI | Observability | [`SEQ-006`](diagrams/sequences/SEQ-006-action-trace-inspector.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-010`](../.agents/tasks/TASK-010-action-inspector-dropdown.md) | `APPROVED` |
 | [`UC-009`](use-cases/UC-009-realtime-telemetry-console-sidebar.md) | Consola Lateral Derecha en Tiempo Real | Observability | [`SEQ-007`](diagrams/sequences/SEQ-007-realtime-trace-streaming.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-011`](../.agents/tasks/TASK-011-realtime-console-right-sidebar.md) | `APPROVED` |
+| [`UC-010`](use-cases/UC-010-mcp-active-tool-execution.md) | Ejecución Activa de Herramientas MCP | Automation | [`SEQ-008`](diagrams/sequences/SEQ-008-mcp-live-tool-invocation.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-012`](../.agents/tasks/TASK-012-mcp-active-executor.md) | `APPROVED` |
 
 ---
 
@@ -45,6 +47,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 - [`SEQ-005`](diagrams/sequences/SEQ-005-react-reasoning-and-mcp-installation.md) — Ciclo de razonamiento ReAct multi-paso y autoinstalación dinámica de servidores MCP.
 - [`SEQ-006`](diagrams/sequences/SEQ-006-action-trace-inspector.md) — Streaming de eventos de telemetría y exportación al portapapeles.
 - [`SEQ-007`](diagrams/sequences/SEQ-007-realtime-trace-streaming.md) — Streaming en tiempo real a la consola lateral derecha de trazabilidad.
+- [`SEQ-008`](diagrams/sequences/SEQ-008-mcp-live-tool-invocation.md) — Invocación y ejecución activa de herramientas MCP (Google Calendar).
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
