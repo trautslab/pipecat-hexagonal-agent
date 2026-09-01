@@ -62,7 +62,7 @@ if HAS_PYDANTIC:
         whisper_device: str = Field(default="auto", alias="WHISPER_DEVICE")
 
         ollama_base_url: str = Field(default="http://localhost:11434/v1", alias="OLLAMA_BASE_URL")
-        ollama_model: str = Field(default="qwen2.5:3b", alias="OLLAMA_MODEL")
+        ollama_model: str = Field(default="llama3.1:8b", alias="OLLAMA_MODEL")
 
         piper_voice_name: str = Field(default="es_ES-davefx-medium", alias="PIPER_VOICE_NAME")
         piper_model_path: Optional[str] = Field(default=None, alias="PIPER_MODEL_PATH")
@@ -101,7 +101,7 @@ else:
         whisper_device: str = "auto"
 
         ollama_base_url: str = "http://localhost:11434/v1"
-        ollama_model: str = "qwen2.5:3b"
+        ollama_model: str = "llama3.1:8b"
 
         piper_voice_name: str = "es_ES-davefx-medium"
         piper_model_path: Optional[str] = None
