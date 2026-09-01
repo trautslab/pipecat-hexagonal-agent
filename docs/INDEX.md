@@ -14,6 +14,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0004`: Integración de SearchPort y Grounding en Tiempo Real](adr/ADR-0004-web-search-grounding.md)
   - [`ADR-0005`: Persistencia de Conversaciones y Autoconocimiento de MCPs](adr/ADR-0005-chat-history-persistence-and-mcp-integration.md)
   - [`ADR-0006`: Motor ReAct y Gestor Autónomo de MCPs estilo OpenClaw](adr/ADR-0006-openclaw-reasoning-and-dynamic-mcp.md)
+  - [`ADR-0007`: Desplegable de Telemetría e Inspección de Acciones en la UI](adr/ADR-0007-action-inspector-ui.md)
 
 ---
 
@@ -28,6 +29,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-005`](use-cases/UC-005-web-search-grounded-qa.md) | Grounding Factual con Búsqueda Web | Tools/Grounding | [`SEQ-003`](diagrams/sequences/SEQ-003-tool-calling-search.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-005`](../.agents/tasks/TASK-005-web-search-tool.md) | `APPROVED` |
 | [`UC-006`](use-cases/UC-006-chat-persistence-and-mcp-scaffolding.md) | Persistencia de Chats y UI Copiado | UI/Chat | [`SEQ-004`](diagrams/sequences/SEQ-004-session-resumption-and-tool-generation.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-006`](../.agents/tasks/TASK-006-chat-history-and-copy-actions.md), [`TASK-007`](../.agents/tasks/TASK-007-proactive-mcp-scaffolder.md) | `APPROVED` |
 | [`UC-007`](use-cases/UC-007-openclaw-autonomous-reasoning-mcp.md) | Motor ReAct y Autoinstalación MCP | OpenClaw/Agent | [`SEQ-005`](diagrams/sequences/SEQ-005-react-reasoning-and-mcp-installation.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-008`](../.agents/tasks/TASK-008-autonomous-react-engine.md), [`TASK-009`](../.agents/tasks/TASK-009-dynamic-mcp-manager.md) | `APPROVED` |
+| [`UC-008`](use-cases/UC-008-action-inspector-telemetry.md) | Inspector de Acciones y Telemetría UI | Observability | [`SEQ-006`](diagrams/sequences/SEQ-006-action-trace-inspector.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-010`](../.agents/tasks/TASK-010-action-inspector-dropdown.md) | `APPROVED` |
 
 ---
 
@@ -39,6 +41,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 - [`SEQ-003`](diagrams/sequences/SEQ-003-tool-calling-search.md) — Flujo de invocación de búsqueda web e inyección de evidencias en el LLM.
 - [`SEQ-004`](diagrams/sequences/SEQ-004-session-resumption-and-tool-generation.md) — Reanudación de sesiones y scaffolding de adaptadores.
 - [`SEQ-005`](diagrams/sequences/SEQ-005-react-reasoning-and-mcp-installation.md) — Ciclo de razonamiento ReAct multi-paso y autoinstalación dinámica de servidores MCP.
+- [`SEQ-006`](diagrams/sequences/SEQ-006-action-trace-inspector.md) — Streaming de eventos de telemetría y exportación al portapapeles.
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
