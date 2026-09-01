@@ -1,7 +1,7 @@
 /**
- * Aura Voice AI - Web Client v0.6.0
- * Soporte para Historial de Conversaciones Persistente (ChatGPT/Claude UI),
- * Visualización de Ciclo ReAct / OpenClaw Thoughts, Botón de Copiado y Streaming WebSocket.
+ * Aura Voice AI - Web Client v0.7.0
+ * Soporte para Inspector Desplegable de Acciones y Telemetría Completa (OpenClaw style),
+ * Botón de Copiado de Registros Técnicos, Historial Persistente y Streaming WebSocket.
  */
 
 class VoiceAgentApp {
@@ -108,9 +108,9 @@ class VoiceAgentApp {
       messages: [
         {
           role: "bot",
-          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con un motor de razonamiento autónomo para investigar en internet y autoinstalarme herramientas MCP (como Google Calendar o bases de datos). ¿Qué deseas construir o consultar hoy?",
+          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con un motor de razonamiento autónomo (ReAct) para investigar en internet y autoinstalarme herramientas MCP (como Google Calendar o bases de datos). Cada acción queda registrada en el desplegable de telemetría. ¿Qué deseas consultar hoy?",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          trace: []
+          telemetry: null
         }
       ]
     };
@@ -134,7 +134,7 @@ class VoiceAgentApp {
 
     this.captionsStream.innerHTML = "";
     session.messages.forEach(m => {
-      this.renderMessageBubble(m.role, m.text, m.time, false, m.trace);
+      this.renderMessageBubble(m.role, m.text, m.time, false, m.telemetry);
     });
     this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
 
@@ -176,12 +176,12 @@ class VoiceAgentApp {
     });
   }
 
-  addMessageToCurrentSession(role, text, trace = []) {
+  addMessageToCurrentSession(role, text, telemetry = null) {
     const session = this.sessions.find(s => s.id === this.currentSessionId);
     if (!session) return;
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    session.messages.push({ role, text, time, trace });
+    session.messages.push({ role, text, time, telemetry });
 
     if (role === "user" && (session.title === "Nueva Conversación" || session.title.startsWith("Conversación"))) {
       session.title = text.length > 28 ? text.substring(0, 28) + "..." : text;
@@ -189,35 +189,53 @@ class VoiceAgentApp {
     }
 
     this.saveSessions();
-    this.renderMessageBubble(role, text, time, true, trace);
+    this.renderMessageBubble(role, text, time, true, telemetry);
   }
 
   /* ============================================================================
-     3. RENDER MESSAGE BUBBLE WITH THOUGHT TRACE & COPY BUTTON
+     3. RENDER MESSAGE BUBBLE WITH ACTION INSPECTOR DROPDOWN
      ============================================================================ */
-  renderMessageBubble(role, text, time, autoScroll = true, trace = []) {
+  renderMessageBubble(role, text, time, autoScroll = true, telemetry = null) {
     const bubble = document.createElement("div");
     bubble.className = `message-bubble ${role === "bot" ? "bot" : "user"}`;
 
-    let thoughtHtml = "";
-    if (trace && trace.length > 0) {
-      const stepsHtml = trace.map(step => {
+    let inspectorHtml = "";
+    if (telemetry && (telemetry.steps && telemetry.steps.length > 0 || telemetry.duration_ms)) {
+      const stepsCount = telemetry.steps ? telemetry.steps.length : 0;
+      const stepsListHtml = (telemetry.steps || []).map(step => {
         let icon = "🧠";
         if (step.kind === "action") icon = "⚙️";
         if (step.kind === "observation") icon = "✅";
         return `
-          <div class="thought-step">
-            <span class="thought-icon">${icon}</span>
+          <div class="telemetry-step">
+            <span>${icon}</span>
             <div><strong>${step.title}:</strong> ${step.detail}</div>
           </div>
         `;
       }).join("");
 
-      thoughtHtml = `
-        <div class="thought-box">
-          <div class="thought-header">⚡ Razonamiento Autónomo ReAct</div>
-          ${stepsHtml}
-        </div>
+      const filesHtml = (telemetry.files_affected && telemetry.files_affected.length > 0)
+        ? `<div>📁 <strong>Archivos modificados:</strong> ${telemetry.files_affected.map(f => `<code>${f}</code>`).join(", ")}</div>`
+        : "";
+
+      inspectorHtml = `
+        <details class="action-inspector" open>
+          <summary>
+            <span>⚡ Acciones y Telemetría (${stepsCount} eventos • ${telemetry.duration_ms || 0}ms)</span>
+            <button class="copy-telemetry-btn" title="Copiar registro de acciones al portapapeles">
+              <span>📋</span> Copiar Registro
+            </button>
+          </summary>
+          <div class="inspector-body">
+            <div class="telemetry-meta">
+              <span>⏱️ Latencia: <strong>${telemetry.duration_ms || 0}ms</strong></span>
+              <span>🤖 Modelo: <strong>${telemetry.model || "Llama 3.1 8B"}</strong></span>
+              <span>🕒 Hora: <strong>${telemetry.timestamp || time}</strong></span>
+            </div>
+            ${stepsListHtml}
+            ${filesHtml}
+          </div>
+        </details>
       `;
     }
 
@@ -231,12 +249,23 @@ class VoiceAgentApp {
           </button>
         </div>
       </div>
-      ${thoughtHtml}
+      ${inspectorHtml}
       <div class="bubble-text">${this.formatText(text)}</div>
     `;
 
     const copyBtn = bubble.querySelector(".copy-msg-btn");
     copyBtn.onclick = () => this.copyToClipboard(text, copyBtn);
+
+    if (telemetry) {
+      const copyTelemBtn = bubble.querySelector(".copy-telemetry-btn");
+      if (copyTelemBtn) {
+        copyTelemBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.copyTelemetryToClipboard(telemetry, copyTelemBtn);
+        };
+      }
+    }
 
     this.captionsStream.appendChild(bubble);
     if (autoScroll) {
@@ -272,6 +301,30 @@ class VoiceAgentApp {
         btnElement.innerHTML = "<span>📋</span> Copiar";
       }, 2000);
     }
+  }
+
+  copyTelemetryToClipboard(telemetry, btnElement) {
+    let md = `### ⚡ Registro de Acciones y Telemetría Aura\n`;
+    md += `- **Timestamp:** ${telemetry.iso_timestamp || telemetry.timestamp}\n`;
+    md += `- **Modelo LLM:** ${telemetry.model || "Llama 3.1 8B"}\n`;
+    md += `- **Latencia Total:** ${telemetry.duration_ms}ms\n`;
+    md += `- **Prompt Usuario:** "${telemetry.user_prompt || ''}"\n\n`;
+    md += `#### 📋 Pasos Ejecutados:\n`;
+    if (telemetry.steps && telemetry.steps.length > 0) {
+      telemetry.steps.forEach((s, idx) => {
+        md += `${idx + 1}. **[${s.kind ? s.kind.toUpperCase() : 'STEP'}] ${s.title}:** ${s.detail}\n`;
+      });
+    } else {
+      md += `(Respuesta conversacional directa)\n`;
+    }
+    if (telemetry.files_affected && telemetry.files_affected.length > 0) {
+      md += `\n#### 📁 Archivos Afectados:\n`;
+      telemetry.files_affected.forEach(f => {
+        md += `- \`${f}\`\n`;
+      });
+    }
+
+    this.copyToClipboard(md, btnElement);
   }
 
   /* ============================================================================
@@ -481,7 +534,7 @@ class VoiceAgentApp {
             }
           } else if (msg.type === "caption") {
             if (msg.text) {
-              this.addMessageToCurrentSession(msg.role || "bot", msg.text, msg.trace || []);
+              this.addMessageToCurrentSession(msg.role || "bot", msg.text, msg.telemetry || null);
               if (msg.speak) {
                 this.speakText(msg.text);
               }

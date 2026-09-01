@@ -654,18 +654,18 @@ body {
 
 .captions-stream {
   min-height: 140px;
-  max-height: 280px;
+  max-height: 320px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   padding-right: 6px;
 }
 
-/* Message Bubble with Copy Button */
+/* Message Bubble */
 .message-bubble {
-  padding: 14px 18px;
-  border-radius: 16px;
+  padding: 16px 20px;
+  border-radius: 18px;
   font-size: 0.9rem;
   line-height: 1.6;
   border: 1px solid transparent;
@@ -686,7 +686,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .bubble-actions {
@@ -697,7 +697,7 @@ body {
 
 .bubble-name {
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: var(--accent-primary);
 }
 
@@ -706,13 +706,13 @@ body {
   color: var(--text-muted);
 }
 
-/* Copy Icon Button in Message */
+/* Copy Icon Button */
 .copy-msg-btn {
   background: var(--bg-card-secondary);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   border-radius: 6px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -732,6 +732,84 @@ body {
   background: rgba(16, 185, 129, 0.2);
   border-color: var(--accent-emerald);
   color: var(--accent-emerald);
+}
+
+/* Action Inspector Accordion (OpenClaw Telemetry UI) */
+.action-inspector {
+  background: var(--bg-card-secondary);
+  border: 1px solid var(--border-highlight);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.action-inspector summary {
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--accent-primary);
+  user-select: none;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.action-inspector summary:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.copy-telemetry-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-highlight);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.copy-telemetry-btn:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.copy-telemetry-btn.copied {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+  color: #fff;
+}
+
+.inspector-body {
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.telemetry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.telemetry-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
 }
 
 .bubble-text {
@@ -798,44 +876,6 @@ body {
   }
   .providers-grid {
     grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* Thought Trace Box (ReAct OpenClaw Style) */
-.thought-box {
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px dashed var(--border-highlight);
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.thought-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  color: var(--accent-primary);
-  margin-bottom: 6px;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.thought-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
-.thought-step:last-child {
-  margin-bottom: 0;
-}
-
   }
 }
 

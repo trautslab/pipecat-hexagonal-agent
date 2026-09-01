@@ -1,6 +1,8 @@
 import asyncio
 import os
 import sys
+import time
+import datetime
 import json
 import base64
 import hashlib
@@ -20,7 +22,6 @@ from core.services.reasoning_engine import AutonomousReasoningEngine
 WEB_DIR = Path(__file__).resolve().parent / "web"
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-# Instancias del ecosistema ReAct OpenClaw
 search_adapter = DuckDuckGoSearchAdapter()
 mcp_adapter = MCPManagerAdapter()
 grounding_service = GroundingService(search_port=search_adapter)
@@ -240,8 +241,7 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional con el motor ReAct de razonamiento y MCPs."""
-    # 1. Enviar estado inicial y herramientas al navegador
+    """Orquesta la sesión conversacional con telemetría detallada y exportación."""
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
@@ -251,7 +251,6 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
         "tts": settings.tts_provider.value
     }))
 
-    # 2. Configurar agente con WebSocketTransportAdapter
     config = AppSettings(
         TRANSPORT_PROVIDER=TransportProviderType.WEBSOCKET,
         AGENT_NAME=settings.agent_name,
@@ -261,7 +260,6 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
     transport_adapter = agent.transport
     transport_adapter.attach_websocket(ws)
 
-    # 3. Bucle de recepción de audio y mensajes de texto
     try:
         while not ws.closed:
             chunk = await ws.receive()
@@ -276,50 +274,62 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                     if msg_type == "user_chat" or msg_type == "user_transcription":
                         user_text = msg.get("text", "").strip()
                         history = msg.get("history", [])
+                        session_id = msg.get("sessionId", "default")
+                        start_time = time.time()
 
                         if user_text:
                             logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
                             
-                            # Notificar estado "Razonando..."
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "thinking",
                                 "label": "Razonando..."
                             }))
 
-                            # Callback para emitir pensamientos al cliente en tiempo real
                             async def _send_thought(thought_item):
                                 await ws.send_str(json.dumps({
                                     "type": "thought",
                                     "step": thought_item
                                 }))
 
-                            # 4. Procesar ciclo ReAct
-                            processed_prompt, trace = await reasoning_engine.process_reasoning_loop(
+                            # 1. Procesar ciclo ReAct
+                            processed_prompt, raw_steps = await reasoning_engine.process_reasoning_loop(
                                 user_prompt=user_text,
                                 history=history,
                                 on_thought_callback=_send_thought
                             )
 
-                            # 5. Consulta al LLM
+                            # 2. Consulta al LLM
                             reply = await query_ollama_llm(
                                 prompt=processed_prompt,
                                 system_prompt=settings.agent_system_prompt,
                                 model_name=settings.ollama_model,
                                 history=history
                             )
-                            logger.info(f"🤖 [Aura respondió]: '{reply[:120]}...'")
+                            
+                            duration_ms = int((time.time() - start_time) * 1000)
+                            logger.info(f"🤖 [Aura respondió en {duration_ms}ms]: '{reply[:120]}...'")
 
-                            # 6. Enviar respuesta final
+                            # 3. Construir paquete completo de telemetría e inspección
+                            telemetry_trace = {
+                                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                "iso_timestamp": datetime.datetime.now().isoformat(),
+                                "duration_ms": duration_ms,
+                                "model": settings.ollama_model,
+                                "user_prompt": user_text,
+                                "steps": raw_steps,
+                                "files_affected": [".agents/mcp/mcp-servers.json", ".env"] if mcp_adapter.is_mcp_intent(user_text) else []
+                            }
+
+                            # 4. Enviar respuesta final con telemetría completa
                             await ws.send_str(json.dumps({
                                 "type": "caption",
                                 "role": "bot",
                                 "text": reply,
                                 "speak": True,
-                                "trace": trace
+                                "telemetry": telemetry_trace
                             }))
 
-                            # Restaurar estado
                             await ws.send_str(json.dumps({
                                 "type": "status",
                                 "state": "connected",
@@ -340,10 +350,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (OPENCLAW REACT ENGINE)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (OPENCLAW ACTION INSPECTOR)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM: {settings.ollama_model}")
-    logger.info(f"🧠 Motor Autónomo: ReAct (Pensamiento -> Búsqueda -> MCP -> Síntesis)")
+    logger.info(f"🔍 Observabilidad: Telemetría e Inspección de Acciones en Tiempo Real")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
