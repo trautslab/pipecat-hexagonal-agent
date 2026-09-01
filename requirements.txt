@@ -1,0 +1,16 @@
+# Core Pipecat & Pipeline
+pipecat-ai>=0.0.50
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.1
+loguru>=0.7.2
+
+# Free / Local Stack dependencies
+faster-whisper>=1.0.0
+piper-tts>=1.2.0
+sounddevice>=0.4.6
+numpy>=1.26.0
+
+# Cloud Adapters (Optional/Ready-to-use)
+openai>=1.30.0
+aiohttp>=3.9.5
