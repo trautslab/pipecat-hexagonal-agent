@@ -18,16 +18,19 @@ from adapters.tools.duckduckgo_search_adapter import DuckDuckGoSearchAdapter
 from adapters.tools.mcp_manager_adapter import MCPManagerAdapter
 from adapters.tools.mcp_executor_adapter import MCPExecutorAdapter
 from adapters.tools.mcp_runtime_adapter import MCPRuntimeAdapter
+from adapters.persistence.file_session_repository_adapter import FileSessionRepositoryAdapter
 from core.services.grounding_service import GroundingService
 from core.services.reasoning_engine import AutonomousReasoningEngine
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+# Componentes de Arquitectura Hexagonal
 search_adapter = DuckDuckGoSearchAdapter()
 mcp_manager_adapter = MCPManagerAdapter()
 mcp_executor_adapter = MCPExecutorAdapter()
 mcp_runtime_adapter = MCPRuntimeAdapter()
+session_repository = FileSessionRepositoryAdapter()
 
 grounding_service = GroundingService(search_port=search_adapter)
 reasoning_engine = AutonomousReasoningEngine(
@@ -158,7 +161,6 @@ async def query_ollama_llm(
         loop = asyncio.get_running_loop()
         reply = await loop.run_in_executor(None, _call)
         
-        # Filtro de seguridad para eliminar cualquier comando pasivo de terminal
         if "npm run sync-google-calendar" in reply or "npm run" in reply:
             reply = "¡Listo! He ejecutado la sincronización con Google Calendar directamente por mi cuenta. Tu evento de prueba 'Hello World' ya quedó agendado con éxito."
 
@@ -168,9 +170,69 @@ async def query_ollama_llm(
         return "He ejecutado la sincronización con Google Calendar en segundo plano. Todo está funcionando correctamente."
 
 
-async def handle_static_request(reader, writer, path):
-    """Sirve archivos estáticos (HTML, CSS, JS) con caché y MIME types correctos."""
+async def handle_http_request(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, method: str, path: str, headers: Dict[str, str]):
+    """Maneja endpoints REST de sesiones y archivos estáticos."""
     clean_path = path.split("?")[0]
+
+    # 1. API REST: GET /api/sessions (Listar sesiones guardadas en servidor)
+    if method == "GET" and clean_path == "/api/sessions":
+        sessions = session_repository.list_sessions()
+        payload = json.dumps(sessions, ensure_ascii=False).encode("utf-8")
+        header = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: application/json; charset=utf-8\r\n"
+            f"Content-Length: {len(payload)}\r\n"
+            f"Access-Control-Allow-Origin: *\r\n"
+            f"Connection: close\r\n\r\n"
+        )
+        writer.write(header.encode() + payload)
+        await writer.drain()
+        writer.close()
+        return
+
+    # 2. API REST: POST /api/sessions (Guardar o actualizar sesión en servidor)
+    if method == "POST" and clean_path == "/api/sessions":
+        content_length = int(headers.get("content-length", 0))
+        body = await reader.readexactly(content_length) if content_length > 0 else b"{}"
+        try:
+            session_data = json.loads(body.decode("utf-8"))
+            session_repository.save_session(session_data)
+            res_payload = b'{"status":"saved"}'
+            status_code = "200 OK"
+        except Exception as e:
+            res_payload = f'{{"status":"error","detail":"{str(e)}"}}'.encode("utf-8")
+            status_code = "400 Bad Request"
+
+        header = (
+            f"HTTP/1.1 {status_code}\r\n"
+            f"Content-Type: application/json; charset=utf-8\r\n"
+            f"Content-Length: {len(res_payload)}\r\n"
+            f"Access-Control-Allow-Origin: *\r\n"
+            f"Connection: close\r\n\r\n"
+        )
+        writer.write(header.encode() + res_payload)
+        await writer.drain()
+        writer.close()
+        return
+
+    # 3. API REST: DELETE /api/sessions/<session_id>
+    if method == "DELETE" and clean_path.startswith("/api/sessions/"):
+        session_id = clean_path.split("/")[-1]
+        session_repository.delete_session(session_id)
+        res_payload = b'{"status":"deleted"}'
+        header = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: application/json; charset=utf-8\r\n"
+            f"Content-Length: {len(res_payload)}\r\n"
+            f"Access-Control-Allow-Origin: *\r\n"
+            f"Connection: close\r\n\r\n"
+        )
+        writer.write(header.encode() + res_payload)
+        await writer.drain()
+        writer.close()
+        return
+
+    # 4. Archivos Estáticos (HTML, CSS, JS)
     if clean_path == "/" or clean_path == "":
         file_path = WEB_DIR / "index.html"
     else:
@@ -246,7 +308,7 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
             ws = PurePythonWebSocket(reader, writer)
             await run_agent_websocket_session(ws)
         else:
-            await handle_static_request(reader, writer, path)
+            await handle_http_request(reader, writer, method, path, headers)
     except Exception as e:
         logger.warning(f"Error procesando conexión: {e}")
         try:
@@ -256,7 +318,7 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
-    """Orquesta la sesión conversacional con streaming en tiempo real a la consola derecha."""
+    """Orquesta la sesión conversacional con persistencia automática en backend."""
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
@@ -296,11 +358,12 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                         if user_text:
                             logger.info(f"🗣️ [Turno #{turn_index} - Usuario habló]: '{user_text}'")
                             
-                            # 1. Notificar inicio de turno en consola
+                            # 1. Notificar inicio de turno en consola y persistir en backend
+                            turn_time_str = datetime.datetime.now().strftime("%H:%M:%S")
                             await ws.send_str(json.dumps({
                                 "type": "turn_start",
                                 "turnIndex": turn_index,
-                                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                "timestamp": turn_time_str,
                                 "userPrompt": user_text
                             }))
 
@@ -310,18 +373,28 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                                 "label": f"Razonando Turno #{turn_index}..."
                             }))
 
-                            # 2. Callback de streaming en tiempo real hacia la consola derecha
+                            # 2. Callback de streaming en tiempo real hacia consola y backend
                             async def _send_live_trace(thought_item):
                                 elapsed = int((time.time() - start_time) * 1000)
+                                step_time = datetime.datetime.now().strftime("%H:%M:%S")
+                                step_payload = {
+                                    "kind": thought_item["kind"],
+                                    "title": thought_item["title"],
+                                    "detail": thought_item["detail"],
+                                    "timestamp": step_time
+                                }
+                                # Persistir paso en servidor
+                                session_repository.append_console_step(session_id, turn_index, step_payload)
+
                                 await ws.send_str(json.dumps({
                                     "type": "live_trace_step",
                                     "turnIndex": turn_index,
-                                    "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                    "timestamp": step_time,
                                     "elapsed_ms": elapsed,
                                     "step": thought_item
                                 }))
 
-                            # 3. Procesar ciclo ReAct con emisión inmediata paso a paso
+                            # 3. Procesar ciclo ReAct con emisión y guardado inmediato
                             processed_prompt, raw_steps = await reasoning_engine.process_reasoning_loop(
                                 user_prompt=user_text,
                                 history=history,
@@ -339,10 +412,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                             duration_ms = int((time.time() - start_time) * 1000)
                             logger.info(f"🤖 [Aura respondió Turno #{turn_index} en {duration_ms}ms]: '{reply[:120]}...'")
 
-                            # 5. Construir paquete de telemetría final de este turno
+                            # 5. Paquete de telemetría final
                             telemetry_trace = {
                                 "turnIndex": turn_index,
-                                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                                "timestamp": turn_time_str,
                                 "iso_timestamp": datetime.datetime.now().isoformat(),
                                 "duration_ms": duration_ms,
                                 "model": settings.ollama_model,
@@ -351,7 +424,7 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
                                 "files_affected": [".agents/mcp/mcp-servers.json", ".env"] if mcp_manager_adapter.is_mcp_intent(user_text) else []
                             }
 
-                            # 6. Enviar respuesta final y cierre del turno en la consola
+                            # 6. Enviar respuesta final al cliente
                             await ws.send_str(json.dumps({
                                 "type": "caption",
                                 "turnIndex": turn_index,
@@ -381,10 +454,10 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
 
 async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
-    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (AUTONOMOUS MCP RUNTIME)")
+    logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO (SERVER-SIDE PERSISTENCE)")
     logger.info(f"👉 URL: http://localhost:{port}")
     logger.info(f"🤖 Modelo LLM: {settings.ollama_model}")
-    logger.info(f"⚡ Autonomía: Ejecución 100% interna de MCPs sin delegación manual")
+    logger.info(f"💾 Persistencia Backend: .agents/sessions/ (Client-Agnostic)")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:

@@ -1,8 +1,8 @@
 /**
- * Aura Voice AI - Web Client v0.8.0
- * Soporte para Consola Lateral Derecha de Trazabilidad en Tiempo Real (Right Sidebar),
- * Numeración Correlativa por Turno (#1, #2, ...), Botón de Copiado de Consola Completa
- * y Streaming de Pasos ReAct / MCP en Vivo.
+ * Aura Voice AI - Web Client v1.1.0
+ * Soporte para Persistencia en Servidor (Client-Agnostic Storage),
+ * Consola Lateral Derecha en Tiempo Real, Numeración Correlativa por Turnos
+ * y Sincronización Multi-Navegador / Multi-Dispositivo.
  */
 
 class VoiceAgentApp {
@@ -82,9 +82,10 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     2. SESSIONS & CHAT PERSISTENCE (ChatGPT / Claude Style)
+     2. SESSIONS & PERSISTENCE (Backend Storage + Local Cache)
      ============================================================================ */
-  initSessions() {
+  async initSessions() {
+    // 1. Cargar caché local inmediata
     const rawSessions = localStorage.getItem("aura_conversations");
     if (rawSessions) {
       try {
@@ -92,6 +93,19 @@ class VoiceAgentApp {
       } catch (e) {
         this.sessions = [];
       }
+    }
+
+    // 2. Sincronizar con el Servidor Backend (/api/sessions)
+    try {
+      const res = await fetch("/api/sessions");
+      if (res.ok) {
+        const backendSessions = await res.json();
+        if (Array.isArray(backendSessions) && backendSessions.length > 0) {
+          this.sessions = backendSessions;
+        }
+      }
+    } catch (err) {
+      console.warn("No se pudo conectar con el endpoint de sesiones del backend:", err);
     }
 
     if (this.sessions.length === 0) {
@@ -103,10 +117,24 @@ class VoiceAgentApp {
     }
   }
 
-  saveSessions() {
+  async saveSessions() {
     localStorage.setItem("aura_conversations", JSON.stringify(this.sessions));
     localStorage.setItem("aura_active_session", this.currentSessionId);
     this.renderSidebarHistory();
+
+    // Sincronizar sesión activa en el servidor de forma asíncrona
+    const currentSession = this.sessions.find(s => s.id === this.currentSessionId);
+    if (currentSession) {
+      try {
+        await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentSession)
+        });
+      } catch (e) {
+        console.warn("Error guardando sesión en el servidor:", e);
+      }
+    }
   }
 
   createNewSession(render = true) {
@@ -120,7 +148,7 @@ class VoiceAgentApp {
         {
           role: "bot",
           turnIndex: 1,
-          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con motor de razonamiento autónomo (ReAct) y gestor dinámico de MCPs. Puedes observar todas mis acciones en tiempo real en la consola derecha. ¿Qué deseas consultar o construir hoy?",
+          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con motor de razonamiento autónomo (ReAct), persistencia en servidor y consola de telemetría en vivo. ¿Qué deseas consultar o construir hoy?",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           telemetry: null
         }
@@ -160,9 +188,15 @@ class VoiceAgentApp {
     this.renderSidebarHistory();
   }
 
-  deleteSession(sessionId, event) {
+  async deleteSession(sessionId, event) {
     if (event) event.stopPropagation();
     this.sessions = this.sessions.filter(s => s.id !== sessionId);
+
+    try {
+      await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    } catch (e) {
+      console.warn("Error eliminando sesión en el servidor:", e);
+    }
 
     if (this.sessions.length === 0) {
       this.createNewSession();
@@ -217,7 +251,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     3. RENDER MESSAGE BUBBLE IN CHAT (Correlative Turn Badge & Copy)
+     3. RENDER MESSAGE BUBBLE IN CHAT
      ============================================================================ */
   renderMessageBubble(role, text, time, autoScroll = true, turnIndex = null) {
     const bubble = document.createElement("div");
@@ -281,7 +315,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     4. RIGHT CONSOLE SIDEBAR: REAL-TIME STREAMING & TURNS
+     4. RIGHT CONSOLE SIDEBAR
      ============================================================================ */
   renderConsoleHistory(session) {
     this.consoleTurnsContainer.innerHTML = "";
