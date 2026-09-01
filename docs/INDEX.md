@@ -19,6 +19,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0009`: Ejecución Activa y Verificación de Herramientas MCP](adr/ADR-0009-mcp-tool-execution-client.md)
   - [`ADR-0010`: Runtime Autónomo de MCPs y Prohibición de Comandos Manuales](adr/ADR-0010-autonomous-mcp-subprocess-runtime.md)
   - [`ADR-0011`: Persistencia de Estado y Telemetría en el Backend](adr/ADR-0011-client-agnostic-server-side-persistence.md)
+  - [`ADR-0012`: Rediseño de Interfaz a Layout Postman / Modern IDE Workbench](adr/ADR-0012-postman-ide-workbench-ui.md)
 
 ---
 
@@ -38,6 +39,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-010`](use-cases/UC-010-mcp-active-tool-execution.md) | Ejecución Activa de Herramientas MCP | Automation | [`SEQ-008`](diagrams/sequences/SEQ-008-mcp-live-tool-invocation.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-012`](../.agents/tasks/TASK-012-mcp-active-executor.md) | `APPROVED` |
 | [`UC-011`](use-cases/UC-011-autonomous-mcp-execution-engine.md) | Motor Autónomo y Cero Comandos Manuales | Autonomous Agent | [`SEQ-009`](diagrams/sequences/SEQ-009-autonomous-tool-runner.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-013`](../.agents/tasks/TASK-013-autonomous-mcp-runtime.md) | `APPROVED` |
 | [`UC-012`](use-cases/UC-012-server-side-session-telemetry-persistence.md) | Persistencia de Estado en Servidor | Persistence | [`SEQ-010`](diagrams/sequences/SEQ-010-backend-session-sync.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-014`](../.agents/tasks/TASK-014-server-side-persistence.md) | `APPROVED` |
+| [`UC-013`](use-cases/UC-013-ide-workbench-layout.md) | Layout IDE Workbench (Postman Style) | UI/UX Layout | [`SEQ-011`](diagrams/sequences/SEQ-011-ide-workbench-interaction.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-015`](../.agents/tasks/TASK-015-ide-workbench-layout.md) | `APPROVED` |
 
 ---
 
@@ -54,6 +56,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 - [`SEQ-008`](diagrams/sequences/SEQ-008-mcp-live-tool-invocation.md) — Invocación y ejecución activa de herramientas MCP (Google Calendar).
 - [`SEQ-009`](diagrams/sequences/SEQ-009-autonomous-tool-runner.md) — Ejecución autónoma de subprocesos MCP y eliminación de directivas pasivas.
 - [`SEQ-010`](diagrams/sequences/SEQ-010-backend-session-sync.md) — Sincronización y persistencia de sesiones y telemetría en backend.
+- [`SEQ-011`](diagrams/sequences/SEQ-011-ide-workbench-interaction.md) — Flujo de interacción en layout Postman/IDE Workbench.
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
