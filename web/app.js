@@ -1,8 +1,7 @@
 /**
- * Aura Voice AI - Web Client v1.1.0
- * Soporte para Persistencia en Servidor (Client-Agnostic Storage),
- * Consola Lateral Derecha en Tiempo Real, Numeración Correlativa por Turnos
- * y Sincronización Multi-Navegador / Multi-Dispositivo.
+ * Aura Voice AI — Postman / Modern IDE Workbench v1.2.0
+ * Soporte para Layout de 5 Zonas (Header, Sidebar, Workbench, Right Console, Footer),
+ * Persistencia en Backend, Streaming de Traza ReAct y Ejecución de Herramientas.
  */
 
 class VoiceAgentApp {
@@ -22,23 +21,25 @@ class VoiceAgentApp {
     this.currentSessionId = null;
     this.activeTurnCounter = 0;
 
-    // DOM Elements
+    // DOM Elements - Header
     this.themeToggleBtn = document.getElementById("theme-toggle-btn");
     this.themeIcon = document.getElementById("theme-icon");
-    this.toggleSidebarBtn = document.getElementById("toggle-sidebar-btn");
+    this.toggleConsoleTopBtn = document.getElementById("toggle-console-top-btn");
+    this.topConnectionPill = document.getElementById("top-connection-pill");
+    this.topStatusText = document.getElementById("top-status-text");
+    this.globalSearchInput = document.getElementById("global-search-input");
+
+    // DOM Elements - Sidebar
     this.sidebar = document.getElementById("sidebar");
     this.newChatBtn = document.getElementById("new-chat-btn");
     this.historyList = document.getElementById("history-list");
+    this.sessionCountBadge = document.getElementById("session-count-badge");
+    this.sidebarFilterInput = document.getElementById("sidebar-filter-input");
+
+    // DOM Elements - Workbench
+    this.tabSessionTitle = document.getElementById("tab-session-title");
+    this.tabAddBtn = document.getElementById("tab-add-btn");
     this.currentChatTitle = document.getElementById("current-chat-title");
-
-    // Right Console Sidebar DOM Elements
-    this.toggleConsoleBtn = document.getElementById("toggle-console-btn");
-    this.rightConsoleSidebar = document.getElementById("right-console-sidebar");
-    this.closeConsoleBtn = document.getElementById("close-console-btn");
-    this.copyConsoleBtn = document.getElementById("copy-console-btn");
-    this.consoleEmptyState = document.getElementById("console-empty-state");
-    this.consoleTurnsContainer = document.getElementById("console-turns-container");
-
     this.toggleMicBtn = document.getElementById("toggle-mic-btn");
     this.btnText = document.getElementById("btn-text");
     this.statusBadge = document.getElementById("status-badge");
@@ -49,6 +50,25 @@ class VoiceAgentApp {
     this.captionsStream = document.getElementById("captions-stream");
     this.audioTestBtn = document.getElementById("audio-test-btn");
     this.clearCaptionsBtn = document.getElementById("clear-captions-btn");
+    this.lastLatencyVal = document.getElementById("last-latency-val");
+
+    // Response Tabs
+    this.tabChatTimeline = document.getElementById("tab-chat-timeline");
+    this.tabJsonTelemetry = document.getElementById("tab-json-telemetry");
+    this.tabMcpStatus = document.getElementById("tab-mcp-status");
+
+    // DOM Elements - Right Console Sidebar
+    this.rightConsoleSidebar = document.getElementById("right-console-sidebar");
+    this.closeConsoleBtn = document.getElementById("close-console-btn");
+    this.copyConsoleBtn = document.getElementById("copy-console-btn");
+    this.consoleEmptyState = document.getElementById("console-empty-state");
+    this.consoleTurnsContainer = document.getElementById("console-turns-container");
+    this.quickPromptInput = document.getElementById("quick-prompt-input");
+    this.quickPromptSendBtn = document.getElementById("quick-prompt-send-btn");
+
+    // DOM Elements - Footer
+    this.footerToggleSidebar = document.getElementById("footer-toggle-sidebar");
+    this.footerToggleConsole = document.getElementById("footer-toggle-console");
 
     this.animationId = null;
     this.dataArray = null;
@@ -62,7 +82,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     1. THEME SWITCHER (Light / Dark Mode)
+     1. THEME SWITCHER
      ============================================================================ */
   initTheme() {
     const savedTheme = localStorage.getItem("aura-theme") || "dark";
@@ -82,10 +102,9 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     2. SESSIONS & PERSISTENCE (Backend Storage + Local Cache)
+     2. SESSIONS & PERSISTENCE
      ============================================================================ */
   async initSessions() {
-    // 1. Cargar caché local inmediata
     const rawSessions = localStorage.getItem("aura_conversations");
     if (rawSessions) {
       try {
@@ -95,7 +114,6 @@ class VoiceAgentApp {
       }
     }
 
-    // 2. Sincronizar con el Servidor Backend (/api/sessions)
     try {
       const res = await fetch("/api/sessions");
       if (res.ok) {
@@ -122,7 +140,6 @@ class VoiceAgentApp {
     localStorage.setItem("aura_active_session", this.currentSessionId);
     this.renderSidebarHistory();
 
-    // Sincronizar sesión activa en el servidor de forma asíncrona
     const currentSession = this.sessions.find(s => s.id === this.currentSessionId);
     if (currentSession) {
       try {
@@ -148,7 +165,7 @@ class VoiceAgentApp {
         {
           role: "bot",
           turnIndex: 1,
-          text: "¡Hola! Soy Aura, tu asistente e ingeniera de software. Cuento con motor de razonamiento autónomo (ReAct), persistencia en servidor y consola de telemetría en vivo. ¿Qué deseas consultar o construir hoy?",
+          text: "¡Hola! Soy Aura, tu ingeniera de software y asistente de voz en el Workbench IDE. Cuento con Arquitectura Hexagonal, Búsqueda Web, Ejecución MCP y Consola en vivo. ¿Qué deseas construir o probar hoy?",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           telemetry: null
         }
@@ -172,19 +189,17 @@ class VoiceAgentApp {
 
     this.currentSessionId = sessionId;
     this.currentChatTitle.textContent = session.title;
+    this.tabSessionTitle.textContent = session.title.length > 20 ? session.title.substring(0, 20) + "..." : session.title;
     this.activeTurnCounter = session.turnCounter || session.messages.length;
     localStorage.setItem("aura_active_session", sessionId);
 
-    // 1. Renderizar mensajes en el chat
     this.captionsStream.innerHTML = "";
     session.messages.forEach(m => {
       this.renderMessageBubble(m.role, m.text, m.time, false, m.turnIndex);
     });
     this.captionsStream.scrollTop = this.captionsStream.scrollHeight;
 
-    // 2. Renderizar historial de consola derecha
     this.renderConsoleHistory(session);
-
     this.renderSidebarHistory();
   }
 
@@ -211,15 +226,20 @@ class VoiceAgentApp {
 
   renderSidebarHistory() {
     this.historyList.innerHTML = "";
+    this.sessionCountBadge.textContent = this.sessions.length;
+
+    const filter = (this.sidebarFilterInput ? this.sidebarFilterInput.value.toLowerCase() : "").trim();
 
     this.sessions.forEach(session => {
+      if (filter && !session.title.toLowerCase().includes(filter)) return;
+
       const item = document.createElement("div");
       item.className = `history-item ${session.id === this.currentSessionId ? "active" : ""}`;
       item.onclick = () => this.selectSession(session.id);
 
       item.innerHTML = `
         <span class="history-title" title="${session.title}">${session.title}</span>
-        <button class="history-delete-btn" title="Eliminar conversación" aria-label="Eliminar">🗑️</button>
+        <button class="history-delete-btn" title="Eliminar conversación">🗑️</button>
       `;
 
       const delBtn = item.querySelector(".history-delete-btn");
@@ -243,6 +263,7 @@ class VoiceAgentApp {
     if (role === "user" && (session.title === "Nueva Conversación" || session.title.startsWith("Conversación"))) {
       session.title = text.length > 28 ? text.substring(0, 28) + "..." : text;
       this.currentChatTitle.textContent = session.title;
+      this.tabSessionTitle.textContent = session.title.length > 20 ? session.title.substring(0, 20) + "..." : session.title;
     }
 
     this.saveSessions();
@@ -263,7 +284,7 @@ class VoiceAgentApp {
       <div class="bubble-header">
         <div class="bubble-title-group">
           ${turnNum ? `<span class="turn-badge ${role}">${turnNum}</span>` : ""}
-          <span class="bubble-name">${role === "bot" ? "🤖 Aura" : "👤 Tú"}</span>
+          <span class="bubble-name">${role === "bot" ? "🤖 Aura Voice AI" : "👤 Tú"}</span>
         </div>
         <div class="bubble-actions">
           <span class="bubble-time">${time || "Ahora"}</span>
@@ -426,6 +447,10 @@ class VoiceAgentApp {
     turnEntry.status = "done";
     this.saveSessions();
 
+    if (telemetry && telemetry.duration_ms && this.lastLatencyVal) {
+      this.lastLatencyVal.textContent = `${telemetry.duration_ms}ms`;
+    }
+
     const tag = document.getElementById(`turn-tag-${turnIndex}`);
     if (tag) {
       tag.className = "turn-tag-live done";
@@ -481,63 +506,114 @@ class VoiceAgentApp {
      5. EVENT LISTENERS
      ============================================================================ */
   initEvents() {
-    this.toggleSidebarBtn.addEventListener("click", () => {
+    // Toggles for Sidebar & Console
+    const toggleSidebar = () => {
       this.sidebar.classList.toggle("collapsed");
-    });
+      if (this.footerToggleSidebar) {
+        this.footerToggleSidebar.classList.toggle("active", !this.sidebar.classList.contains("collapsed"));
+      }
+    };
 
-    this.toggleConsoleBtn.addEventListener("click", () => {
+    const toggleConsole = () => {
       this.rightConsoleSidebar.classList.toggle("collapsed");
-      this.toggleConsoleBtn.classList.toggle("active", !this.rightConsoleSidebar.classList.contains("collapsed"));
-    });
+      const isVisible = !this.rightConsoleSidebar.classList.contains("collapsed");
+      if (this.toggleConsoleTopBtn) this.toggleConsoleTopBtn.classList.toggle("active", isVisible);
+      if (this.footerToggleConsole) this.footerToggleConsole.classList.toggle("active", isVisible);
+    };
 
-    this.closeConsoleBtn.addEventListener("click", () => {
-      this.rightConsoleSidebar.classList.add("collapsed");
-      this.toggleConsoleBtn.classList.remove("active");
-    });
+    if (this.toggleConsoleTopBtn) this.toggleConsoleTopBtn.addEventListener("click", toggleConsole);
+    if (this.closeConsoleBtn) this.closeConsoleBtn.addEventListener("click", toggleConsole);
+    if (this.footerToggleConsole) this.footerToggleConsole.addEventListener("click", toggleConsole);
+    if (this.footerToggleSidebar) this.footerToggleSidebar.addEventListener("click", toggleSidebar);
 
-    this.copyConsoleBtn.addEventListener("click", () => {
-      this.copyConsoleToClipboard();
-    });
+    if (this.copyConsoleBtn) this.copyConsoleBtn.addEventListener("click", () => this.copyConsoleToClipboard());
+    if (this.newChatBtn) this.newChatBtn.addEventListener("click", () => this.createNewSession());
+    if (this.tabAddBtn) this.tabAddBtn.addEventListener("click", () => this.createNewSession());
 
-    this.newChatBtn.addEventListener("click", () => {
-      this.createNewSession();
-    });
+    if (this.sidebarFilterInput) {
+      this.sidebarFilterInput.addEventListener("input", () => this.renderSidebarHistory());
+    }
 
-    this.toggleMicBtn.addEventListener("click", () => {
-      if (!this.isConnected) {
-        this.startSession();
-      } else {
-        this.stopSession();
-      }
-    });
+    if (this.toggleMicBtn) {
+      this.toggleMicBtn.addEventListener("click", () => {
+        if (!this.isConnected) {
+          this.startSession();
+        } else {
+          this.stopSession();
+        }
+      });
+    }
 
-    this.audioTestBtn.addEventListener("click", () => this.playAudioTest());
+    if (this.audioTestBtn) this.audioTestBtn.addEventListener("click", () => this.playAudioTest());
     
-    this.clearCaptionsBtn.addEventListener("click", () => {
-      const session = this.sessions.find(s => s.id === this.currentSessionId);
-      if (session) {
-        session.messages = [];
-        session.consoleLogs = [];
-        session.turnCounter = 0;
-        this.saveSessions();
+    if (this.clearCaptionsBtn) {
+      this.clearCaptionsBtn.addEventListener("click", () => {
+        const session = this.sessions.find(s => s.id === this.currentSessionId);
+        if (session) {
+          session.messages = [];
+          session.consoleLogs = [];
+          session.turnCounter = 0;
+          this.saveSessions();
+        }
+        this.captionsStream.innerHTML = "";
+        this.consoleTurnsContainer.innerHTML = "";
+        this.consoleEmptyState.classList.remove("hidden");
+      });
+    }
+
+    // Quick Text Prompt Send
+    const sendQuickPrompt = () => {
+      const text = this.quickPromptInput.value.trim();
+      if (!text) return;
+      this.quickPromptInput.value = "";
+
+      const userTurn = this.addMessageToCurrentSession("user", text);
+
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        this.connectWebSocket(() => {
+          this.sendPromptWebSocket(text, userTurn);
+        });
+      } else {
+        this.sendPromptWebSocket(text, userTurn);
       }
-      this.captionsStream.innerHTML = "";
-      this.consoleTurnsContainer.innerHTML = "";
-      this.consoleEmptyState.classList.remove("hidden");
-    });
+    };
+
+    if (this.quickPromptSendBtn) this.quickPromptSendBtn.addEventListener("click", sendQuickPrompt);
+    if (this.quickPromptInput) {
+      this.quickPromptInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendQuickPrompt();
+      });
+    }
 
     window.addEventListener("resize", () => this.resizeCanvas());
   }
 
+  sendPromptWebSocket(text, turnIndex) {
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    this.socket.send(JSON.stringify({
+      type: "user_chat",
+      sessionId: this.currentSessionId,
+      turnIndex: turnIndex,
+      history: session ? session.messages.slice(-6) : [],
+      text: text
+    }));
+  }
+
   resizeCanvas() {
+    if (!this.canvas) return;
     const rect = this.canvas.parentElement.getBoundingClientRect();
     this.canvas.width = rect.width;
     this.canvas.height = rect.height;
   }
 
   setStatus(state, label) {
-    this.statusBadge.className = `status-badge ${state.toLowerCase()}`;
-    this.statusText.textContent = label.toUpperCase();
+    if (this.statusBadge) {
+      this.statusBadge.className = `status-badge ${state.toLowerCase()}`;
+      this.statusText.textContent = label.toUpperCase();
+    }
+    if (this.topStatusText) {
+      this.topStatusText.textContent = `WS 8765 ${label.toUpperCase()}`;
+    }
   }
 
   /* ============================================================================
@@ -625,7 +701,7 @@ class VoiceAgentApp {
       this.startActiveWaveform();
     } catch (err) {
       console.error("Error al acceder al micrófono:", err);
-      this.setStatus("disconnected", "Error Micrófono");
+      this.setStatus("disconnected", "Error Mic");
       alert("Error al iniciar micrófono: " + err.message);
       this.stopSession();
     }
@@ -679,7 +755,7 @@ class VoiceAgentApp {
     } catch (e) {}
   }
 
-  connectWebSocket() {
+  connectWebSocket(onOpenCallback = null) {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host || "localhost:8765";
     const wsUrl = `${protocol}//${host}/ws`;
@@ -690,6 +766,7 @@ class VoiceAgentApp {
     this.socket.onopen = () => {
       console.log("✅ WebSocket conectado con ReAct Live Streaming Console.");
       this.setStatus("connected", "Escuchando");
+      if (onOpenCallback) onOpenCallback();
     };
 
     this.socket.onmessage = (event) => {
@@ -748,9 +825,9 @@ class VoiceAgentApp {
   }
 
   updateProviders(msg) {
-    if (msg.stt) document.getElementById("stt-val").textContent = msg.stt;
-    if (msg.llm) document.getElementById("llm-val").textContent = msg.llm;
-    if (msg.tts) document.getElementById("tts-val").textContent = msg.tts;
+    if (msg.stt && document.getElementById("stt-val")) document.getElementById("stt-val").textContent = msg.stt;
+    if (msg.llm && document.getElementById("llm-val")) document.getElementById("llm-val").textContent = msg.llm;
+    if (msg.tts && document.getElementById("tts-val")) document.getElementById("tts-val").textContent = msg.tts;
   }
 
   handleAudioInput(event) {
@@ -789,7 +866,7 @@ class VoiceAgentApp {
   }
 
   playAudioTest() {
-    const text = "¡Hola! La salida de audio de tus altavoces está funcionando perfectamente.";
+    const text = "¡Hola! La salida de audio de tus altavoces está funcionando perfectamente en el IDE Workbench.";
     this.speakText(text);
     this.addMessageToCurrentSession("bot", "🔊 " + text);
   }

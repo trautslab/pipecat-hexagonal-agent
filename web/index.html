@@ -3,177 +3,280 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aura | Agente de Voz & Consola de Trazabilidad en Vivo</title>
-  <meta name="description" content="Interfaz conversacional por voz y texto con consola lateral de trazabilidad en tiempo real, historial de chats estilo ChatGPT/Claude, visualizador reactivo y herramientas MCP.">
+  <title>Aura Voice AI — IDE Workbench</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Ambient background glow effects -->
-  <div class="ambient-glow glow-top"></div>
-  <div class="ambient-glow glow-bottom"></div>
-
-  <!-- Main Layout Container (3 Columns) -->
-  <div class="app-layout">
+  <div class="ide-container">
     
-    <!-- 1. LEFT SIDEBAR: Historial de Conversaciones (ChatGPT / Claude Style) -->
-    <aside class="sidebar left-sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <button id="new-chat-btn" class="new-chat-btn">
-          <span class="plus-icon">+</span>
-          <span>Nueva Conversación</span>
+    <!-- ====================================================================
+         1. HEADER (Top Bar)
+         ==================================================================== -->
+    <header class="ide-header">
+      <div class="header-left">
+        <div class="window-controls">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <div class="workspace-selector" id="workspace-selector">
+          <span class="ws-icon">📁</span>
+          <span class="ws-name">Aura Voice AI Workspace</span>
+          <span class="ws-arrow">▾</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="global-search-input" placeholder="Buscar conversaciones, herramientas MCP o evidencias web..." />
+          <span class="search-shortcut">⌘K</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="theme-toggle-btn" class="header-action-btn" title="Cambiar Tema (Claro / Oscuro)">
+          <span id="theme-icon">🌙</span>
         </button>
-      </div>
-
-      <div class="sidebar-history-section">
-        <div class="section-title">Historial de Conversaciones</div>
-        <div class="history-list" id="history-list">
-          <!-- Las sesiones previas se inyectan dinámicamente -->
+        <button id="toggle-console-top-btn" class="header-action-btn active" title="Alternar Consola Derecha">
+          <span>⚡ Live Console</span>
+        </button>
+        <div class="connection-status-pill connected" id="top-connection-pill">
+          <span class="status-indicator"></span>
+          <span id="top-status-text">WS 8765 ONLINE</span>
         </div>
+        <div class="user-avatar" title="Usuario Activo">JL</div>
       </div>
+    </header>
 
-      <div class="sidebar-footer">
-        <div class="mcp-status-pill">
-          <span class="mcp-dot"></span>
-          <span>MCP & Tools Activos</span>
+    <!-- ====================================================================
+         MAIN BODY (Sidebar + Workbench + Right Sidebar)
+         ==================================================================== -->
+    <div class="ide-body">
+      
+      <!-- ==================================================================
+           2. SIDEBAR (Left Column)
+           ================================================================== -->
+      <aside class="ide-sidebar" id="sidebar">
+        <div class="sidebar-nav-tabs">
+          <button class="nav-tab active" title="Colecciones de Conversaciones">🗂️</button>
+          <button class="nav-tab" title="Servidores MCP">⚙️</button>
+          <button class="nav-tab" title="Búsqueda Web">🌐</button>
+          <button class="nav-tab" title="Historial">⏱️</button>
         </div>
-      </div>
-    </aside>
 
-    <!-- 2. CENTER AREA: Main Workspace Card -->
-    <div class="app-card">
-      <!-- Header -->
-      <header class="app-header">
-        <div class="brand">
-          <button id="toggle-sidebar-btn" class="icon-btn sidebar-toggle" title="Alternar historial de conversaciones" aria-label="Historial">
-            ☰
-          </button>
-          <div class="brand-badge">🎙️</div>
-          <div>
-            <div class="title-row">
-              <h1>Aura Voice AI</h1>
-              <span class="version-tag">v0.8.0</span>
+        <div class="sidebar-header-search">
+          <div class="sidebar-filter-wrapper">
+            <span class="filter-icon">🔍</span>
+            <input type="text" id="sidebar-filter-input" placeholder="Filtrar chats..." />
+          </div>
+          <button id="new-chat-btn" class="sidebar-add-btn" title="Nueva Conversación">+</button>
+        </div>
+
+        <div class="sidebar-content">
+          <div class="sidebar-tree-group">
+            <div class="tree-group-title">
+              <span>▾ CONVERSACIONES</span>
+              <span class="tree-count" id="session-count-badge">0</span>
             </div>
-            <span class="subtitle">Hexagonal Agent • Real-Time ReAct & MCP Telemetry</span>
+            <div class="history-list" id="history-list">
+              <!-- Renderizado dinámico desde app.js -->
+            </div>
+          </div>
+
+          <div class="sidebar-tree-group">
+            <div class="tree-group-title">
+              <span>▾ SERVIDORES MCP & TOOLS</span>
+            </div>
+            <div class="tree-items-static">
+              <div class="tree-item-static active">
+                <span class="item-tag tag-mcp">MCP</span>
+                <span class="item-label">Google Calendar (Active Probe)</span>
+              </div>
+              <div class="tree-item-static">
+                <span class="item-tag tag-tool">TOOL</span>
+                <span class="item-label">DuckDuckGo WebSearch</span>
+              </div>
+              <div class="tree-item-static">
+                <span class="item-tag tag-core">REACT</span>
+                <span class="item-label">Autonomous Reasoning Engine</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sidebar-collapsible-group">
+            <details class="collapsible-tree-section">
+              <summary>▸ ENVIRONMENTS (.env)</summary>
+              <div class="section-subtext">GOOGLE_CALENDAR_CLIENT_ID, OLLAMA_MODEL</div>
+            </details>
+            <details class="collapsible-tree-section">
+              <summary>▸ SPECS & ARCHITECTURE</summary>
+              <div class="section-subtext">Hexagonal Ports & Adapters (14/14 Evals)</div>
+            </details>
+            <details class="collapsible-tree-section">
+              <summary>▸ PERSISTENCE</summary>
+              <div class="section-subtext">Backend Store (.agents/sessions/)</div>
+            </details>
           </div>
         </div>
+      </aside>
+
+      <!-- ==================================================================
+           3. WORKBENCH (Center Column)
+           ================================================================== -->
+      <main class="ide-workbench" id="workbench">
         
-        <div class="header-actions">
-          <!-- Console Toggle Button -->
-          <button id="toggle-console-btn" class="icon-btn console-toggle active" aria-label="Alternar Consola de Trazabilidad" title="Alternar Consola de Trazabilidad en Vivo">
-            ⚡
-          </button>
-
-          <!-- Theme Toggle Button -->
-          <button id="theme-toggle-btn" class="icon-btn" aria-label="Cambiar tema" title="Cambiar tema claro/oscuro">
-            <span id="theme-icon">🌙</span>
-          </button>
-
-          <!-- Status Indicator -->
-          <div class="status-badge disconnected" id="status-badge">
-            <span class="status-dot"></span>
-            <span id="status-text">DESCONECTADO</span>
+        <!-- Tab Bar -->
+        <div class="workbench-tabs-bar">
+          <div class="workbench-tab active" id="active-workbench-tab">
+            <span class="tab-method-tag">VOICE</span>
+            <span class="tab-title" id="tab-session-title">Conversación Activa</span>
+            <span class="tab-close-icon">×</span>
           </div>
-        </div>
-      </header>
+          <button class="workbench-tab-add" id="tab-add-btn" title="Nueva Pestaña">+</button>
 
-      <!-- Active Architecture Providers -->
-      <section class="providers-grid">
-        <div class="provider-card">
-          <div class="card-tag">STT (Voz a Texto)</div>
-          <div class="card-val" id="stt-val">Faster-Whisper (Local $0)</div>
-        </div>
-        <div class="provider-card">
-          <div class="card-tag">LLM (Cerebro)</div>
-          <div class="card-val" id="llm-val">Llama 3.1 8B (Local)</div>
-        </div>
-        <div class="provider-card">
-          <div class="card-tag">Herramientas</div>
-          <div class="card-val" id="tools-val">WebSearch & MCP Manager</div>
-        </div>
-        <div class="provider-card">
-          <div class="card-tag">Transporte</div>
-          <div class="card-val" id="transport-val">WebSocket PCM 16kHz</div>
-        </div>
-      </section>
-
-      <!-- Visualizer Stage -->
-      <main class="visualizer-stage">
-        <div class="canvas-container">
-          <canvas id="waveform-canvas"></canvas>
-          <div class="stage-overlay" id="stage-overlay">
-            <div class="overlay-icon">⚡</div>
-            <p>Presiona el botón para iniciar la conversación por voz</p>
+          <div class="workbench-env-dropdown">
+            <span class="env-label">Ambiente:</span>
+            <span class="env-value">🟢 Ollama Local (llama3.1:8b)</span>
+            <span class="env-arrow">▾</span>
           </div>
         </div>
 
-        <!-- Action Button Controls -->
-        <div class="controls-row">
-          <button id="toggle-mic-btn" class="cta-button idle" aria-label="Iniciar Conversación">
-            <div class="cta-glow"></div>
-            <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="btn-icon">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2a1 1 0 0 0-2 0v2a9 9 0 0 0 8 8.945V22a1 1 0 0 0 2 0v-1.055A9 9 0 0 0 21 12v-2a1 1 0 0 0-2 0Z"/>
-            </svg>
-            <span id="btn-text">INICIAR CONVERSACIÓN</span>
-          </button>
-
-          <button id="audio-test-btn" class="secondary-btn" title="Probar salida de audio de voz">
-            <span>🔊 Probar Audio</span>
-          </button>
+        <!-- Breadcrumb & Top Info -->
+        <div class="workbench-breadcrumb-bar">
+          <div class="breadcrumb-text">
+            <span>Aura Workspace</span>
+            <span class="b-sep">/</span>
+            <span>Sessions</span>
+            <span class="b-sep">/</span>
+            <strong id="current-chat-title">Nueva Conversación</strong>
+          </div>
+          <div class="workbench-header-actions">
+            <button class="wb-btn-text" id="clear-captions-btn">🗑️ Limpiar</button>
+            <button class="wb-btn-text" id="audio-test-btn">🔊 Probar Audio</button>
+          </div>
         </div>
+
+        <!-- Upper Workbench: Voice Stage & Visualizer -->
+        <div class="workbench-upper-stage">
+          <div class="stage-card">
+            <div class="stage-visualizer-container">
+              <canvas id="waveform-canvas"></canvas>
+              
+              <div id="stage-overlay" class="stage-overlay">
+                <div class="pulse-ring"></div>
+                <span class="overlay-icon">🎙️</span>
+                <p>Haz clic en <strong>Iniciar Conversación</strong> o presiona el botón inferior para interactuar por voz</p>
+              </div>
+            </div>
+
+            <div class="stage-controls-bar">
+              <button id="toggle-mic-btn" class="cta-button idle">
+                <span class="mic-icon">🎙️</span>
+                <span id="btn-text">INICIAR CONVERSACIÓN</span>
+              </button>
+
+              <div class="stage-status-group">
+                <div id="status-badge" class="status-badge disconnected">
+                  <span class="badge-dot"></span>
+                  <span id="status-text">DESCONECTADO</span>
+                </div>
+              </div>
+
+              <div class="stage-tech-tags">
+                <span class="tech-tag" title="Speech to Text">STT: <strong id="stt-val">Whisper</strong></span>
+                <span class="tech-tag" title="Large Language Model">LLM: <strong id="llm-val">Llama 3.1 8B</strong></span>
+                <span class="tech-tag" title="Text to Speech">TTS: <strong id="tts-val">Piper</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lower Workbench: Response Viewer & Chat Timeline -->
+        <div class="workbench-lower-response">
+          <div class="response-tabs-bar">
+            <div class="response-tabs-left">
+              <button class="response-tab active" id="tab-chat-timeline">💬 Timeline / Chat</button>
+              <button class="response-tab" id="tab-json-telemetry">{} JSON Telemetría</button>
+              <button class="response-tab" id="tab-mcp-status">⚙️ Estado MCP</button>
+            </div>
+            <div class="response-metrics-right">
+              <span class="metric-badge success">200 OK</span>
+              <span class="metric-item">⏱️ <span id="last-latency-val">144ms</span></span>
+              <span class="metric-item">🤖 Ollama (llama3.1:8b)</span>
+              <span class="metric-item">💾 Persistido en Backend</span>
+            </div>
+          </div>
+
+          <div class="captions-container" id="captions-container">
+            <div id="captions-stream" class="captions-stream">
+              <!-- Burbujas de mensajes correlativos renderizadas dinámicamente -->
+            </div>
+          </div>
+        </div>
+
       </main>
 
-      <!-- Live Conversation Captions -->
-      <section class="captions-panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <span class="live-dot"></span>
-            <h2 id="current-chat-title">Conversación Actual</h2>
+      <!-- ==================================================================
+           4. RIGHT SIDEBAR (AI Copilot & Live ReAct Console)
+           ================================================================== -->
+      <aside class="ide-right-sidebar" id="right-console-sidebar">
+        <div class="right-sidebar-header">
+          <div class="right-header-title">
+            <span class="ai-badge">AI</span>
+            <h3>Aura Live Console & Copilot</h3>
           </div>
-          <button id="clear-captions-btn" class="clear-btn" title="Limpiar pantalla actual">Limpiar Pantalla</button>
+          <div class="right-header-actions">
+            <button id="copy-console-btn" class="console-action-btn" title="Copiar Trazabilidad de la Consola">
+              <span>📋</span> Copiar
+            </button>
+            <button id="close-console-btn" class="console-action-btn close" title="Cerrar Consola">×</button>
+          </div>
         </div>
 
-        <div class="captions-stream" id="captions-stream">
-          <!-- Mensajes dinámicos con numeración correlativa y botón de copiado -->
-        </div>
-      </section>
+        <div class="right-sidebar-body">
+          <div class="console-empty-state" id="console-empty-state">
+            <div class="console-radar"></div>
+            <h4>Esperando Interacciones de Voz...</h4>
+            <p>Los pensamientos del motor ReAct, llamadas a herramientas MCP, búsquedas en internet y métricas aparecerán aquí en tiempo real.</p>
+          </div>
 
-      <!-- Footer -->
-      <footer class="app-footer">
-        <span>Desarrollado bajo <a href="https://github.com/trautslab/ai-sdlc-framework" target="_blank">AI-SDLC Framework</a></span>
-        <span class="separator">•</span>
-        <span><a href="https://github.com/trautslab/pipecat-hexagonal-agent" target="_blank">GitHub Repository</a></span>
-      </footer>
+          <div class="console-turns-container" id="console-turns-container">
+            <!-- Renderizado en vivo paso a paso por WebSocket -->
+          </div>
+        </div>
+
+        <div class="right-sidebar-footer">
+          <div class="prompt-box-wrapper">
+            <input type="text" id="quick-prompt-input" placeholder="Escribe tu mensaje o comando aquí..." />
+            <button id="quick-prompt-send-btn" class="prompt-send-btn" title="Enviar Mensaje">↑</button>
+          </div>
+          <div class="prompt-hint">Presiona <strong>Enter</strong> para enviar texto o habla directamente por el micrófono</div>
+        </div>
+      </aside>
+
     </div>
 
-    <!-- 3. RIGHT SIDEBAR: Consola de Trazabilidad en Tiempo Real -->
-    <aside class="sidebar right-console-sidebar" id="right-console-sidebar">
-      <div class="console-header">
-        <div class="console-title">
-          <span class="pulse-indicator"></span>
-          <span>Consola de Trazabilidad</span>
-        </div>
-        <div class="console-header-actions">
-          <button id="copy-console-btn" class="copy-console-btn" title="Copiar toda la trazabilidad en Markdown">
-            <span>📋</span> Copiar
-          </button>
-          <button id="close-console-btn" class="console-close-btn" title="Minimizar consola">✕</button>
-        </div>
+    <!-- ====================================================================
+         5. FOOTER (Bottom Status & Tools Bar)
+         ==================================================================== -->
+    <footer class="ide-footer">
+      <div class="footer-left">
+        <button class="footer-btn active"><span class="f-icon">⚡</span> Localhost:8765</button>
+        <button class="footer-btn"><span class="f-icon">💻</span> Terminal</button>
+        <button class="footer-btn"><span class="f-icon">📄</span> Server Logs</button>
       </div>
 
-      <div class="console-body" id="console-body">
-        <div class="console-empty-state" id="console-empty-state">
-          <span>⚡ Esperando actividad...</span>
-          <p>Los pensamientos, llamadas a tools e investigaciones web aparecerán aquí en tiempo real.</p>
-        </div>
-        <div class="console-turns-container" id="console-turns-container">
-          <!-- Acordeones de cada turno correlativo se inyectan en tiempo real -->
-        </div>
+      <div class="footer-right">
+        <span class="footer-meta">Backend: Pure Python WebSocket</span>
+        <span class="footer-meta">Store: .agents/sessions/</span>
+        <button class="footer-toggle-btn" id="footer-toggle-sidebar" title="Alternar Barra Izquierda">🗖 Sidebar</button>
+        <button class="footer-toggle-btn active" id="footer-toggle-console" title="Alternar Consola Derecha">🗗 Consola</button>
       </div>
-    </aside>
+    </footer>
 
   </div>
 
