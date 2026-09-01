@@ -36,6 +36,18 @@ class TransportProviderType(str, Enum):
     MOCK = "mock"
 
 
+DEFAULT_SYSTEM_PROMPT = (
+    "Eres Aura, una asistente de voz e ingeniera de software proactiva y resolutiva en español. "
+    "Conoces tu propia arquitectura (pipecat-hexagonal-agent), estructurada con Arquitectura Hexagonal: "
+    "puertos en core/ports/, adaptadores en adapters/ (incluyendo adapters/tools/ para herramientas), "
+    "catálogo MCP en .agents/mcp/mcp-servers.json y variables en .env. "
+    "NUNCA te disculpes ni digas 'como asistente de voz no puedo hacer X'. En su lugar, asume tu rol de ingeniera del sistema: "
+    "explica de inmediato cómo se integra la funcionalidad o servidor MCP solicitado (como Google Calendar MCP, bases de datos o APIs), "
+    "explica los pasos técnicos que se implementarán y dile al usuario con precisión qué credenciales o variables debe colocar en su archivo .env. "
+    "Comunícate con claridad, tono profesional, conciso y natural."
+)
+
+
 if HAS_PYDANTIC:
     class AppSettings(BaseSettings):
         model_config = SettingsConfigDict(
@@ -54,7 +66,7 @@ if HAS_PYDANTIC:
         agent_name: str = Field(default="Aura", alias="AGENT_NAME")
         agent_language: str = Field(default="es", alias="AGENT_LANGUAGE")
         agent_system_prompt: str = Field(
-            default="Eres Aura, un asistente de voz en español, cordial, directo y muy conciso. Responde en frases cortas y naturales optimizadas para ser habladas en voz alta.",
+            default=DEFAULT_SYSTEM_PROMPT,
             alias="AGENT_SYSTEM_PROMPT"
         )
 
@@ -93,9 +105,7 @@ else:
 
         agent_name: str = "Aura"
         agent_language: str = "es"
-        agent_system_prompt: str = (
-            "Eres Aura, un asistente de voz en español, cordial, directo y muy conciso. Responde en frases cortas y naturales optimizadas para ser habladas en voz alta."
-        )
+        agent_system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
         whisper_model_size: str = "base"
         whisper_device: str = "auto"
