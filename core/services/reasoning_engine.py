@@ -1,6 +1,9 @@
 import asyncio
 import re
 import datetime
+import json
+import urllib.request
+import urllib.error
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from config.logger_config import logger
 from core.services.grounding_service import GroundingService
@@ -12,8 +15,8 @@ from core.ports.mcp_runtime_port import MCPRuntimePort
 class AutonomousReasoningEngine:
     """
     Motor de Razonamiento Autónomo ReAct (Reasoning + Acting) estilo OpenClaw / OpenHands.
-    Orquesta pensamientos, extracción semántica NLP de parámetros (título, fecha, hora, ubicación, descripción),
-    autoinstalación y ejecución activa de herramientas MCP.
+    Orquesta pensamientos, extracción semántica estructurada nativa del LLM (Tool Calling),
+    autoinstalación y ejecución activa de herramientas MCP con reglas de proactividad.
     """
 
     MONTHS = {
@@ -27,19 +30,81 @@ class AutonomousReasoningEngine:
         grounding_service: GroundingService,
         mcp_manager: MCPPort,
         mcp_executor: Optional[MCPExecutorPort] = None,
-        mcp_runtime: Optional[MCPRuntimePort] = None
+        mcp_runtime: Optional[MCPRuntimePort] = None,
+        ollama_model: str = "llama3.1:8b"
     ):
         self.grounding = grounding_service
         self.mcp_mgr = mcp_manager
         self.mcp_executor = mcp_executor
         self.mcp_runtime = mcp_runtime
+        self.ollama_model = ollama_model
+
+    async def llm_reason_and_extract_tool_call(self, user_prompt: str) -> Optional[Dict[str, Any]]:
+        """Invoca al LLM para razonar nativamente y emitir un Tool Call JSON con reglas de proactividad."""
+        ollama_url = "http://localhost:11434/api/chat"
+        now = datetime.datetime.now()
+
+        system_instruction = (
+            "Eres el Motor de Razonamiento ReAct de Aura Voice AI.\n"
+            f"La fecha y hora actual del sistema es: {now.strftime('%Y-%m-%d %H:%M:%S')}.\n\n"
+            "Tu tarea es analizar la solicitud del usuario y emitir la llamada estructurada a la herramienta de Google Calendar aplicando PROACTIVIDAD Y MEJORES PRÁCTICAS.\n\n"
+            "Reglas de Excelencia y Proactividad:\n"
+            "1. Extrae el título exacto solicitado por el usuario (elimina muletillas como 'quiero que me hagas un evento').\n"
+            "2. Extrae o deduce la fecha en formato YYYY-MM-DD (asume el año actual o futuro correspondiente).\n"
+            "3. Extrae o deduce la hora en formato HH:MM:SS en 24 horas (ej. 5:15 pm -> 17:15:00).\n"
+            "4. Extrae la ubicación si fue mencionada en el contexto.\n"
+            "5. REDACTA UNA DESCRIPCIÓN PROACTIVA, AMABLE Y DETALLADA CON EMOJIS (ej. 🎬 Recordatorio, 📅 Fecha/Hora, 📍 Ubicación, ✨ Buenos deseos).\n\n"
+            "Responde ÚNICAMENTE con un bloque JSON válido:\n"
+            "{\n"
+            '  "tool": "google_calendar.create_event",\n'
+            '  "parameters": {\n'
+            '    "title": "Preparación para ir al cine Planet de 2 de mayo",\n'
+            '    "date": "2026-09-01",\n'
+            '    "time": "17:15:00",\n'
+            '    "location": "Cineplanet - 2 de Mayo",\n'
+            '    "description": "🎬 Recordatorio: Preparación para ir al cine Planet de 2 de mayo\\n📅 Fecha: 01/09/2026 a las 17:15 hrs\\n📍 Ubicación: Cineplanet - 2 de Mayo\\n\\n✨ Agendado automáticamente por Aura Voice AI. ¡Que disfrutes mucho de la película!"\n'
+            "  }\n"
+            "}"
+        )
+
+        payload = {
+            "model": self.ollama_model,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            "format": "json",
+            "stream": False
+        }
+
+        def _call():
+            req = urllib.request.Request(
+                ollama_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                content = res_data.get("message", {}).get("content", "")
+                return json.loads(content)
+
+        try:
+            loop = asyncio.get_running_loop()
+            tool_call_json = await loop.run_in_executor(None, _call)
+            if isinstance(tool_call_json, dict) and "parameters" in tool_call_json:
+                logger.info(f"🧠 [LLM Tool Calling Nativo]: {tool_call_json}")
+                return tool_call_json["parameters"]
+        except Exception as e:
+            logger.warning(f"Fallback a extractor determinista (LLM Tool Calling error: {e})")
+
+        return None
 
     def parse_calendar_parameters(self, text: str) -> Dict[str, Any]:
-        """Extrae con alta precisión NLP el título exacto, fecha, hora, ubicación y descripción amable."""
+        """Extractor determinista de respaldo (Fallback NLP)."""
         t = text.lower()
         now = datetime.datetime.now()
 
-        # 1. Extracción de Fecha (ej. '1 de septiembre del 2026', 'hoy', 'mañana', 'pasado mañana')
+        # 1. Extracción de Fecha
         target_date = None
         date_display = now.strftime("%d/%m/%Y")
 
@@ -59,12 +124,8 @@ class AutonomousReasoningEngine:
             tomorrow = now + datetime.timedelta(days=1)
             target_date = tomorrow.strftime("%Y-%m-%d")
             date_display = tomorrow.strftime("%d/%m/%Y")
-        elif "pasado mañana" in t:
-            after_tomorrow = now + datetime.timedelta(days=2)
-            target_date = after_tomorrow.strftime("%Y-%m-%d")
-            date_display = after_tomorrow.strftime("%d/%m/%Y")
 
-        # 2. Extracción de Hora (ej. '5:15 de la tarde', '17:15', '5:15', '4:09')
+        # 2. Extracción de Hora
         target_time = None
         time_display = "17:00"
 
@@ -95,19 +156,15 @@ class AutonomousReasoningEngine:
             target_time = future.strftime("%H:%M:%S")
             time_display = future.strftime("%H:%M")
 
-        # 3. Extracción de Título Exacto (NLP Clause Parsing)
+        # 3. Extracción de Título
         title = None
-
-        # Patrón 1: Cláusula de nombrado directo (ej. 'el evento llámalo preparación para ir al cine Planet de 2 de mayo')
         named_match = re.search(r'(?:ll[aá]malo|llamado|nombralo|titulado|t[ií]tulo|con el nombre|con nombre)\s+(?:como\s+|de\s+)?["\']?([^"\',.\n]+)', text, re.IGNORECASE)
         if named_match:
             raw_title = named_match.group(1).strip()
-            # Limpiar posibles colas
             raw_title = re.sub(r'\s+(?:para las|a las|el d[ií]a|por favor).*$', '', raw_title, flags=re.IGNORECASE)
             if len(raw_title) > 2:
                 title = raw_title.strip()
 
-        # Patrón 2: Acción directa (ej. 'crea un evento de preparación para el cine...')
         if not title:
             action_match = re.search(r'(?:crea|agenda|programa|hazme|haz)\s+(?:un\s+|una\s+)?(?:evento\s+)?(?:de\s+|para\s+)?([^,\n]+?)(?:\s+(?:para las|a las|el d[ií]a|el \d)\b|$)', text, re.IGNORECASE)
             if action_match:
@@ -117,24 +174,18 @@ class AutonomousReasoningEngine:
                     title = candidate.strip()
 
         if not title:
-            if "hello world" in t:
-                title = "Hello World - Prueba Aura Voice AI"
-            else:
-                title = "Cita y Recordatorio Personal"
+            title = "Hello World - Prueba Aura Voice AI" if "hello world" in t else "Cita y Recordatorio Personal"
 
-        # Formatear título en Title Case amable
         title = title[0].upper() + title[1:] if title else "Evento de Calendario"
 
-        # 4. Extracción de Ubicación
+        # 4. Ubicación
         location = None
         if "cine planet" in t or "cineplanet" in t:
             location = "Cineplanet - 2 de Mayo"
         elif "2 de mayo" in t:
             location = "Av. 2 de Mayo"
-        elif "oficina" in t:
-            location = "Oficina Principal"
 
-        # 5. Generación de Descripción Amable
+        # 5. Descripción
         friendly_description = (
             f"🎬 Recordatorio: {title}\n"
             f"📅 Fecha: {date_display} a las {time_display} hrs\n"
@@ -156,7 +207,6 @@ class AutonomousReasoningEngine:
         """Detecta si el usuario pide probar, revisar, sincronizar o ejecutar una herramienta."""
         t = text.lower()
         
-        # Si pide explícitamente instalar/integrar por primera vez, no ejecutar todavía
         if any(w in t for w in ["instala", "instalar", "integra", "integrar", "añade", "añadir"]) and not any(w in t for w in ["prueba", "test", "evento", "agenda", "crea", "4:", "16:", "5:", "17:"]):
             return None
 
@@ -179,7 +229,7 @@ class AutonomousReasoningEngine:
     ) -> Tuple[str, List[Dict[str, str]]]:
         """
         Ejecuta el ciclo ReAct:
-        1. THOUGHT: Identifica intención y extrae parámetros completos (título, fecha, hora, ubicación).
+        1. THOUGHT: Razonamiento Nativo del LLM para extraer parámetros estructurados y proactivos.
         2. ACTION: Ejecuta Google Calendar API v3 o WebSearch en segundo plano.
         3. OBSERVATION: Recopila confirmación de ejecución con enlaces oficiales.
         4. SYNTHESIS: Retorna el prompt contextualizado y la traza de pasos.
@@ -201,24 +251,37 @@ class AutonomousReasoningEngine:
         # 1. PRIORIDAD 1: Intención de EJECUCIÓN PARAMETRIZADA O CREACIÓN DE EVENTO
         exec_key = self.is_mcp_execution_intent(user_prompt)
         if exec_key:
-            params = self.parse_calendar_parameters(user_prompt)
-            title = params["title"]
-            target_date = params["date"]
-            date_display = params["date_display"]
-            target_time = params["time"]
-            time_display = params["time_display"]
-            location = params["location"]
-            description = params["description"]
+            # A. Razonamiento Nativo del LLM (Tool Calling)
+            llm_params = await self.llm_reason_and_extract_tool_call(user_prompt)
+            if llm_params and llm_params.get("title"):
+                title = llm_params.get("title")
+                target_date = llm_params.get("date")
+                target_time = llm_params.get("time")
+                location = llm_params.get("location")
+                description = llm_params.get("description")
+                date_display = target_date or datetime.datetime.now().strftime("%d/%m/%Y")
+                time_display = target_time or "17:00:00"
+                thought_source = "Razonamiento Nativo del LLM (Llama 3.1:8b)"
+            else:
+                params = self.parse_calendar_parameters(user_prompt)
+                title = params["title"]
+                target_date = params["date"]
+                date_display = params["date_display"]
+                target_time = params["time"]
+                time_display = params["time_display"]
+                location = params["location"]
+                description = params["description"]
+                thought_source = "Extractor Heurístico Resiliente"
 
             await _emit_thought(
-                "Extracción NLP de Metadatos y Entorno",
-                f"Parámetros extraídos: Título='{title}', Fecha='{date_display}', Hora='{time_display}', Ubicación='{location or 'No especificada'}'. Verificando Google Calendar API...",
+                f"Extracción de Parámetros y Proactividad ({thought_source})",
+                f"Parámetros: Título='{title}', Fecha='{date_display}', Hora='{time_display}', Ubicación='{location or 'No especificada'}'. Generando recordatorio amable...",
                 "thought"
             )
 
             await _emit_thought(
                 "Ejecución Autónoma en Google Calendar API v3",
-                f"Invocando google_calendar.insert_real_event(title='{title}', date='{date_display}', time='{time_display}') con recordatorio amable...",
+                f"Invocando google_calendar.insert_real_event(title='{title}', date='{date_display}', time='{time_display}') con metadatos y descripción redactada...",
                 "action"
             )
 
