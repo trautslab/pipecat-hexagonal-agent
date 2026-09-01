@@ -135,7 +135,6 @@ def eval_task_005_web_search_grounding() -> bool:
         assert grounding.should_search("¿Dónde queda la Universidad Nacional de Ingeniería?") is True
         assert grounding.should_search("Hola") is False
 
-        # Probar generación de prompt enriquecido
         async def _test():
             prompt = await grounding.get_grounded_prompt("Universidad Nacional de Ingenieria del Peru")
             assert "[INFORMACIÓN VERIFICADA" in prompt
@@ -149,39 +148,68 @@ def eval_task_005_web_search_grounding() -> bool:
         return False
 
 
+def eval_task_006_chat_history_and_copy() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-006: Historial de Conversaciones y Acciones de Copiado...")
+    try:
+        web_index = (ROOT_DIR / "web" / "index.html").read_text()
+        web_app = (ROOT_DIR / "web" / "app.js").read_text()
+        web_styles = (ROOT_DIR / "web" / "styles.css").read_text()
+
+        assert "sidebar" in web_index, "Sidebar no encontrado en index.html"
+        assert "history-list" in web_index, "history-list no encontrado en index.html"
+        assert "new-chat-btn" in web_index, "new-chat-btn no encontrado en index.html"
+        assert "copyToClipboard" in web_app, "copyToClipboard no implementado en app.js"
+        assert "aura_conversations" in web_app, "Persistencia aura_conversations ausente en app.js"
+
+        print("✅ [EVAL TASK-006] Superada: Sidebar de chats, persistencia y botones de copiado validados.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-006] Falló: {e}")
+        return False
+
+
+def eval_task_007_mcp_proactive_scaffolding() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-007: Autoconocimiento del Sistema y Scaffolding Proactivo de MCPs...")
+    try:
+        from config.settings import settings
+        prompt = settings.agent_system_prompt
+        assert "pipecat-hexagonal-agent" in prompt, "System prompt no conoce el repositorio"
+        assert "core/ports/" in prompt, "System prompt no conoce la capa de puertos"
+        assert "adapters/" in prompt, "System prompt no conoce la capa de adaptadores"
+        assert ".agents/mcp/" in prompt, "System prompt no conoce la ruta MCP"
+        assert ".env" in prompt, "System prompt no instruye la configuración en .env"
+
+        print("✅ [EVAL TASK-007] Superada: Identidad proactiva y autoconocimiento de arquitectura validados.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-007] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-005)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001 a TASK-007)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
 
     results = {}
 
-    if args.task == "TASK-001" or args.all or not args.task:
-        res = eval_task_001_core_and_ports()
-        results["TASK-001"] = res
-        log_event("EVALUATION", "TASK-001", "SUCCESS" if res else "FAILED", "Eval Harness executed")
+    tasks = [
+        ("TASK-001", eval_task_001_core_and_ports),
+        ("TASK-002", eval_task_002_zero_cost_local_stack),
+        ("TASK-003", eval_task_003_cloud_adapters),
+        ("TASK-004", eval_task_004_websocket_transport_and_web_ui),
+        ("TASK-005", eval_task_005_web_search_grounding),
+        ("TASK-006", eval_task_006_chat_history_and_copy),
+        ("TASK-007", eval_task_007_mcp_proactive_scaffolding)
+    ]
 
-    if args.task == "TASK-002" or args.all or not args.task:
-        res = eval_task_002_zero_cost_local_stack()
-        results["TASK-002"] = res
-        log_event("EVALUATION", "TASK-002", "SUCCESS" if res else "FAILED", "Eval Harness executed")
-
-    if args.task == "TASK-003" or args.all or not args.task:
-        res = eval_task_003_cloud_adapters()
-        results["TASK-003"] = res
-        log_event("EVALUATION", "TASK-003", "SUCCESS" if res else "FAILED", "Eval Harness executed")
-
-    if args.task == "TASK-004" or args.all or not args.task:
-        res = eval_task_004_websocket_transport_and_web_ui()
-        results["TASK-004"] = res
-        log_event("EVALUATION", "TASK-004", "SUCCESS" if res else "FAILED", "Eval Harness executed")
-
-    if args.task == "TASK-005" or args.all or not args.task:
-        res = eval_task_005_web_search_grounding()
-        results["TASK-005"] = res
-        log_event("EVALUATION", "TASK-005", "SUCCESS" if res else "FAILED", "Eval Harness executed")
+    for task_id, fn in tasks:
+        if args.task == task_id or args.all or not args.task:
+            res = fn()
+            results[task_id] = res
+            log_event("EVALUATION", task_id, "SUCCESS" if res else "FAILED", "Eval Harness executed")
 
     total = len(results)
     passed = sum(1 for v in results.values() if v)

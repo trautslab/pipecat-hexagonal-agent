@@ -10,14 +10,22 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.5.0] - 2026-09-01
+
+### Added
+- **Sidebar de Historial de Conversaciones (ChatGPT / Claude UI):** Panel lateral retráctil con lista de chats guardados, botón `+ Nueva Conversación` y persistencia automática en `localStorage`.
+- **Botón de Copiado Rápido (📋):** Icono de copiado en cada burbuja de mensaje con feedback interactivo (`✓ ¡Copiado!`).
+- **Autoconocimiento del Sistema & Scaffolding de MCPs:** Aura ahora asume el rol de ingeniera de software proactiva que comprende su arquitectura hexagonal y guía paso a paso la integración de servidores MCP (ej. Google Calendar), dejando al usuario únicamente la configuración de credenciales en `.env`.
+- **Memoria Conversacional Multi-Turno:** El servidor `web_server.py` mantiene y alimenta el contexto completo de las sesiones activas a Ollama.
+- **Gobernanza AI-SDLC:** Casos de uso `UC-006`, diagrama `SEQ-004`, decisión `ADR-0005`, y contratos `TASK-006` / `TASK-007`.
+
+---
+
 ## [0.4.0] - 2026-09-01
 
 ### Added
 - **Herramienta de Búsqueda Web en Tiempo Real (`SearchPort` & `DuckDuckGoSearchAdapter`):** Permite al agente buscar información en internet a costo $0 sin requerir API keys.
 - **Servicio de Grounding Anti-Alucinaciones (`GroundingService`):** Detecta preguntas factuales/geográficas y compone prompts enriquecidos con evidencias reales de internet antes de consultar al LLM.
-- **Integración en Servidor Web:** `web_server.py` ahora consulta evidencias de internet en vivo al recibir preguntas sobre ubicaciones, direcciones e instituciones.
-- **Gobernanza AI-SDLC para Grounding:** Caso de uso `UC-005`, diagrama de secuencia `SEQ-003`, decisión `ADR-0004` y contrato `TASK-005`.
-- **Harness de Evaluación:** Inclusión del benchmark para `TASK-005` en `evals/harness.py`.
 
 ---
 
@@ -26,7 +34,6 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ### Added
 - **Selector de Temas Light & Dark Mode:** Soporte nativo para alternar entre temas claro y oscuro con persistencia en `localStorage` e iconografía fluida (☀️ / 🌙).
 - **Servidor WebSocket RFC 6455 Nativo:** Implementación en `web_server.py` de handshake y framing de WebSocket binario/texto para conexión bidireccional inmediata.
-- **Visualizador de Ondas Mejorado:** Renderizado reactivo en `<canvas>` con gradientes dinámicos adaptados al tema activo.
 
 ---
 
@@ -44,5 +51,4 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Arquitectura Hexagonal con puertos `STTPort`, `LLMPort`, `TTSPort` y `TransportPort`.
 - Core orquestador `VoiceAgentPipelineBuilder` con soporte para interrupciones (*barge-in*).
 - Adaptadores locales 100% gratuitos para Faster-Whisper, Ollama, Piper/Kokoro TTS y Audio local.
-- Adaptadores cloud con Deepgram, OpenAI, Cartesia y Daily WebRTC.
-- Gobernanza AI-SDLC completa (`AGENTS.md`, `HANDOFF.md`, `CLAUDE.md`, diagramas C4, ADRs y Eval Harness).
+- Gobernanza AI-SDLC completa.
