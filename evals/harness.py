@@ -92,9 +92,38 @@ def eval_task_003_cloud_adapters() -> bool:
         return False
 
 
+def eval_task_004_websocket_transport_and_web_ui() -> bool:
+    print("\n🧪 [EVAL] Evaluando TASK-004: Interfaz Web y Adaptador WebSocket...")
+    try:
+        from adapters.transport.websocket_transport_adapter import WebSocketTransportAdapter
+        config = AppSettings(
+            STT_PROVIDER=STTProviderType.MOCK,
+            LLM_PROVIDER=LLMProviderType.MOCK,
+            TTS_PROVIDER=TTSProviderType.MOCK,
+            TRANSPORT_PROVIDER=TransportProviderType.WEBSOCKET
+        )
+        builder = AgentFactory.build_agent(config)
+        assert "WebSocket Streaming" in builder.transport.provider_name
+        assert isinstance(builder.transport, WebSocketTransportAdapter)
+
+        # Validar existencia de archivos del cliente web
+        web_index = ROOT_DIR / "web" / "index.html"
+        web_styles = ROOT_DIR / "web" / "styles.css"
+        web_app = ROOT_DIR / "web" / "app.js"
+        assert web_index.exists(), "web/index.html no existe"
+        assert web_styles.exists(), "web/styles.css no existe"
+        assert web_app.exists(), "web/app.js no existe"
+
+        print("✅ [EVAL TASK-004] Superada: Adaptador WebSocket y Frontend Web validados.")
+        return True
+    except Exception as e:
+        print(f"❌ [EVAL TASK-004] Falló: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-SDLC Eval Harness")
-    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001, TASK-002, TASK-003)")
+    parser.add_argument("--task", default=None, help="ID de la tarea a evaluar (e.g. TASK-001, TASK-002, TASK-003, TASK-004)")
     parser.add_argument("--all", action="store_true", help="Evaluar todas las tareas registradas")
 
     args = parser.parse_args()
@@ -115,6 +144,11 @@ def main():
         res = eval_task_003_cloud_adapters()
         results["TASK-003"] = res
         log_event("EVALUATION", "TASK-003", "SUCCESS" if res else "FAILED", "Eval Harness executed")
+
+    if args.task == "TASK-004" or args.all or not args.task:
+        res = eval_task_004_websocket_transport_and_web_ui()
+        results["TASK-004"] = res
+        log_event("EVALUATION", "TASK-004", "SUCCESS" if res else "FAILED", "Eval Harness executed")
 
     total = len(results)
     passed = sum(1 for v in results.values() if v)
