@@ -8,6 +8,21 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] - 2026-09-01
+
+### Added
+- **Interfaz Web Interactiva (`web/`):** Cliente web en HTML/CSS/JS con diseño Glassmorphism, Dark Mode, visualizador de ondas de audio en `<canvas>` en tiempo real y subtítulos en streaming.
+- **Adaptador de Transporte WebSocket (`WebSocketTransportAdapter`):** Permite la transmisión bidireccional de tramas de audio PCM de baja latencia con el navegador.
+- **Servidor Web Asíncrono (`web_server.py`):** Servidor HTTP y WebSocket ligero para servir el frontend y gestionar las conexiones de voz.
+- **Gobernanza AI-SDLC para Web:** Caso de uso `UC-004`, diagrama de secuencia `SEQ-002`, decisión arquitectónica `ADR-0003` y contrato de tarea `TASK-004`.
+- **Harness de Evaluación:** Inclusión del benchmark para `TASK-004` en `evals/harness.py`.
+
+---
+
+## [0.1.0] - 2026-09-01
+
 ### Added
 - Arquitectura Hexagonal con puertos `STTPort`, `LLMPort`, `TTSPort` y `TransportPort`.
 - Core orquestador `VoiceAgentPipelineBuilder` con soporte para interrupciones (*barge-in*).

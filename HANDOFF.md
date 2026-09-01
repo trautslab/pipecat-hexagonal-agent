@@ -6,32 +6,29 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `0.1.0`
-- **Fase AI-SDLC:** Fase 4 (Cierre, Documentación y Trazabilidad Completa)
-- **Estado General:** `ESTABLE / PRODUCCIÓN-READY PARA PROTOTIPOS LOCALES Y CLOUD`
+- **Versión:** `0.2.0`
+- **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
+- **Estado General:** `ESTABLE / INTERFAZ WEB Y STREAMING WEBSOCKET COMPLETADOS`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
 1. **Arquitectura Hexagonal:** Implementación completa de puertos (`STTPort`, `LLMPort`, `TTSPort`, `TransportPort`) en `core/ports/`.
-2. **Core Domain & Orchestrator:** `VoiceAgentPipelineBuilder` y `AgentSession` completamente desacoplados de implementaciones concretas.
-3. **Pila 100% Gratuita (Zero-Cost):**
-   - STT: `WhisperLocalSTTAdapter` (Faster-Whisper).
-   - LLM: `OllamaLLMAdapter` (Ollama Llama 3.2).
-   - TTS: `PiperLocalTTSAdapter` (Piper TTS / Kokoro).
-   - Transporte: `LocalAudioTransportAdapter` (Micrófono y parlante del sistema).
-4. **Adaptadores Cloud:** Deepgram, OpenAI, Cartesia y Daily WebRTC listos para conmutación mediante variables de entorno.
-5. **Inyección de Dependencias:** `AgentFactory` resuelve dinámicamente según `.env`.
-6. **Ecosistema AI-SDLC:** Gobernanza con `AGENTS.md`, `CLAUDE.md`, diagramas C4, casos de uso, specs BDD, ADRs, eval harness y telemetría estructurada.
+2. **Pila 100% Gratuita (Zero-Cost):** Faster-Whisper, Ollama (Llama 3.2), Piper/Kokoro TTS y Audio Local.
+3. **Adaptadores Cloud:** Deepgram, OpenAI GPT-4o, Cartesia Sonic y Daily WebRTC.
+4. **Transporte WebSocket:** `WebSocketTransportAdapter` con streaming PCM 16kHz y eventos JSON de subtítulos.
+5. **Interfaz Web Interactiva:** Cliente en `web/` con visualizador de ondas en tiempo real sobre `<canvas>`, subtítulos en vivo y conmutación de estado.
+6. **Gobernanza AI-SDLC:** Matriz de trazabilidad `docs/INDEX.md` al 100% (`UC-001` a `UC-004`, `TASK-001` a `TASK-004`, `SEQ-001`, `SEQ-002`, `ADR-0001` a `ADR-0003`).
+7. **Eval Harness & Tests:** 4/4 tareas y 4/4 unit tests verificados con `demo_live.sh`.
 
 ---
 
 ## 🧭 Próximos Pasos Inmediatos
-1. Añadir soporte para adaptadores de visión multimodal (cámara / frame grabber para modelos como Gemini Flash y GPT-4o Vision).
-2. Integrar `Pipecat Flows` dentro de la capa de dominio para flujos estructurados de conversación (árboles de decisión).
-3. Añadir soporte para llamadas telefónicas mediante adaptador Twilio SIP / Telnyx.
+1. Añadir `VisionPort` para interactuar con frames de cámara web del usuario en tiempo real.
+2. Integrar `Pipecat Flows` para árboles de conversación estructurados (ej. agendamiento o compras).
+3. Añadir soporte para Function Calling / Tools en vivo.
 
 ---
 
 ## 🚦 Bloqueadores
-- Ninguno detectado. Tests unitarios e invariantes pasando al 100%.
+- Ninguno. Todos los tests e invariantes pasando al 100%.

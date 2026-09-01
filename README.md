@@ -1,6 +1,6 @@
 # Pipecat Voice Agent - Arquitectura Hexagonal
 
-Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat**, diseñado con **Arquitectura Hexagonal (Ports & Adapters)**. Permite intercambiar componentes locales y gratuitos (Ollama, Whisper, Piper/Kokoro, Audio local) con servicios cloud (OpenAI, Deepgram, Cartesia, Daily WebRTC) únicamente cambiando variables de entorno.
+Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat**, diseñado con **Arquitectura Hexagonal (Ports & Adapters)** y gobernanza bajo el marco **[AI-SDLC](https://github.com/trautslab/ai-sdlc-framework)**. Permite intercambiar componentes locales y gratuitos (Ollama, Whisper, Piper/Kokoro, Audio local, WebSockets) con servicios cloud (OpenAI, Deepgram, Cartesia, Daily WebRTC) únicamente cambiando variables de entorno.
 
 ---
 
@@ -13,7 +13,7 @@ Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat*
                       │  STT: Whisper Local / Deepgram         │
                       │  LLM: Ollama (Llama 3) / OpenAI        │
                       │  TTS: Piper (Local) / Cartesia         │
-                      │  Transporte: Audio Local / Daily       │
+                      │  Transporte: Audio Local / WS / Daily  │
                       └───────────────────┬────────────────────┘
                                           │ Implementan
                                           ▼
@@ -39,7 +39,7 @@ Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat*
 * **STT (Speech-to-Text):** `Faster-Whisper` / `Whisper Local` (Corre local en CPU / Apple Silicon)
 * **LLM (Language Model):** `Ollama` (con `llama3.2:3b`, `qwen2.5` o `mistral`)
 * **TTS (Text-to-Speech):** `Piper TTS` o `Kokoro` (síntesis de voz rápida local)
-* **Transporte:** `Audio Local` (Micrófono y altavoz del sistema mediante SoundDevice/PyAudio)
+* **Transporte:** `Audio Local` (Micrófono/Altavoz del sistema) o `WebSocket Streaming` (Interfaz Web)
 
 ---
 
@@ -51,7 +51,6 @@ Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat*
    # Descargar Ollama desde https://ollama.com y luego ejecutar:
    ollama run llama3.2:3b
    ```
-3. *(Opcional)* Herramientas de audio del sistema (ej. en Mac: `brew install portaudio`)
 
 ---
 
@@ -73,49 +72,25 @@ Proyecto modular y desacoplado para agentes de voz en tiempo real con **Pipecat*
    cp .env.example .env
    ```
 
-Edita `.env` según los proveedores que quieras activar.
-
 ---
 
-## 🎛️ Configuración de Proveedores (`.env`)
+## 🏃 Modos de Ejecución
 
-### Modo 1: 100% Gratuito y Local (Por Defecto)
-```env
-STT_PROVIDER=whisper_local
-LLM_PROVIDER=ollama
-TTS_PROVIDER=piper_local
-TRANSPORT_PROVIDER=local_audio
-
-# Configuración Ollama
-OLLAMA_BASE_URL=http://localhost:11434/v1
-OLLAMA_MODEL=llama3.2:3b
-
-# Prompt del Asistente
-AGENT_SYSTEM_PROMPT="Eres un asistente de voz inteligente, empático y conciso. Responde en español de forma natural y breve."
-```
-
-### Modo 2: Híbrido o Cloud (Intercambiable sin tocar código)
-```env
-STT_PROVIDER=deepgram
-LLM_PROVIDER=openai
-TTS_PROVIDER=cartesia
-TRANSPORT_PROVIDER=daily_webrtc
-
-# API Keys
-DEEPGRAM_API_KEY=tu_clave_deepgram
-OPENAI_API_KEY=tu_clave_openai
-CARTESIA_API_KEY=tu_clave_cartesia
-DAILY_ROOM_URL=https://tu-dominio.daily.co/tu-sala
-DAILY_TOKEN=tu_token_daily
-```
-
----
-
-## 🏃 Ejecución
-
-Para iniciar el agente:
+### Modo A: Interfaz Web con Visualizador de Ondas en Tiempo Real
+Inicia el servidor web y abre tu navegador:
 ```bash
-python main.py
+python3 web_server.py
+```
+Abre en tu navegador: **`http://localhost:8765`**
+
+### Modo B: Terminal con Micrófono y Altavoz Local
+Inicia el agente directamente por consola:
+```bash
+python3 main.py
 ```
 
-Habla por tu micrófono y el agente te responderá en tiempo real a través de los altavoces.
+### Modo C: Validación Total y Demo (AI-SDLC)
+Ejecuta el linter arquitectónico, el eval harness y la suite de tests:
+```bash
+bash scripts/demo_live.sh
+```
