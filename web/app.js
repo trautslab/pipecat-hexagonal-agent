@@ -1,6 +1,7 @@
 /**
  * Aura Voice AI - Web Client v0.3.0
- * Soporte para Light/Dark Mode, visualizador de ondas reactivo en Canvas y streaming WebSocket.
+ * Soporte para Reconocimiento de Voz nativo (Web Speech API), AudioContext Canvas Visualizer,
+ * Síntesis de voz en español y streaming WebSocket bidireccional con Ollama.
  */
 
 class VoiceAgentApp {
@@ -10,6 +11,7 @@ class VoiceAgentApp {
     this.audioInput = null;
     this.processor = null;
     this.analyser = null;
+    this.recognition = null;
     this.socket = null;
     this.isConnected = false;
     this.isSpeaking = false;
@@ -31,6 +33,7 @@ class VoiceAgentApp {
     this.animationId = null;
     this.dataArray = null;
     this.phase = 0;
+    this.lastTranscriptionTime = 0;
 
     this.initTheme();
     this.initEvents();
@@ -109,7 +112,49 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     3. AUDIO SESSION & WEBSOCKET
+     3. SPEECH SYNTHESIS (Voz del Asistente)
+     ============================================================================ */
+  speakText(text) {
+    if (!('speechSynthesis' in window)) return;
+    
+    window.speechSynthesis.cancel(); // Cancelar locuciones previas
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "es-ES";
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+
+    // Buscar una voz en español natural si está disponible
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang.startsWith("es") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Paulina") || v.name.includes("Mónica") || v.name.includes("Jorge")));
+    if (esVoice) {
+      utterance.voice = esVoice;
+    }
+
+    utterance.onstart = () => {
+      this.isSpeaking = true;
+      this.setStatus("speaking", "Hablando");
+    };
+
+    utterance.onend = () => {
+      this.isSpeaking = false;
+      if (this.isConnected) {
+        this.setStatus("connected", "Escuchando");
+      }
+    };
+
+    utterance.onerror = () => {
+      this.isSpeaking = false;
+      if (this.isConnected) {
+        this.setStatus("connected", "Escuchando");
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  /* ============================================================================
+     4. AUDIO SESSION & WEBSOCKET
      ============================================================================ */
   async startSession() {
     try {
@@ -137,14 +182,17 @@ class VoiceAgentApp {
 
       this.audioInput.connect(this.analyser);
 
-      // 2. Procesador PCM de audio
+      // 2. Procesador PCM de audio (para streaming de audio puro)
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
       this.processor.onaudioprocess = (e) => this.handleAudioInput(e);
 
       this.audioInput.connect(this.processor);
       this.processor.connect(this.audioContext.destination);
 
-      // 3. Conectar WebSocket
+      // 3. Inicializar Reconocimiento de Voz del Navegador (SpeechRecognition)
+      this.initSpeechRecognition();
+
+      // 4. Conectar WebSocket con backend
       this.connectWebSocket();
 
       // UI
@@ -160,6 +208,57 @@ class VoiceAgentApp {
       this.setStatus("disconnected", "Error Micrófono");
       alert("Error al iniciar micrófono: " + err.message);
       this.stopSession();
+    }
+  }
+
+  initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition no soportado en este navegador.");
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = "es-ES";
+    this.recognition.continuous = true;
+    this.recognition.interimResults = false;
+    this.recognition.maxAlternatives = 1;
+
+    this.recognition.onresult = (event) => {
+      const current = event.resultIndex;
+      const transcript = event.results[current][0].transcript.trim();
+      
+      if (transcript.length > 0) {
+        console.log("🗣️ Transcripción detectada:", transcript);
+        this.addCaption("user", transcript);
+
+        // Enviar texto reconocido por WebSocket al backend para inferencia con Ollama
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify({
+            type: "user_transcription",
+            text: transcript
+          }));
+        }
+      }
+    };
+
+    this.recognition.onerror = (event) => {
+      console.warn("Speech recognition error:", event.error);
+    };
+
+    this.recognition.onend = () => {
+      // Reiniciar reconocimiento si la sesión sigue activa
+      if (this.isConnected && this.recognition) {
+        try {
+          this.recognition.start();
+        } catch (e) {}
+      }
+    };
+
+    try {
+      this.recognition.start();
+    } catch (e) {
+      console.warn("No se pudo iniciar SpeechRecognition:", e);
     }
   }
 
@@ -180,9 +279,20 @@ class VoiceAgentApp {
       if (typeof event.data === "string") {
         try {
           const msg = JSON.parse(event.data);
+          
           if (msg.type === "caption") {
             this.addCaption(msg.role || "bot", msg.text);
+            if (msg.speak) {
+              this.speakText(msg.text);
+            }
           } else if (msg.type === "status") {
+            if (msg.state === "thinking") {
+              this.setStatus("listening", msg.label || "Pensando...");
+            } else if (msg.state === "connected") {
+              if (!this.isSpeaking) {
+                this.setStatus("connected", msg.label || "Escuchando");
+              }
+            }
             this.updateProviders(msg);
           }
         } catch (e) {
@@ -247,32 +357,21 @@ class VoiceAgentApp {
   }
 
   playAudioTest() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(440, ctx.currentTime); // Nota La 440Hz
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
-
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
-
-      this.addCaption("bot", "🔊 Prueba de audio de altavoces ejecutada correctamente.");
-    } catch (e) {
-      alert("Error en prueba de audio: " + e.message);
-    }
+    this.speakText("¡Hola! La salida de audio de tus altavoces está funcionando perfectamente.");
+    this.addCaption("bot", "🔊 Prueba de audio de altavoces ejecutada correctamente.");
   }
 
   stopSession() {
     this.isConnected = false;
+    this.isSpeaking = false;
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (this.recognition) {
+      this.recognition.abort();
+      this.recognition = null;
+    }
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(t => t.stop());
     }
@@ -292,7 +391,7 @@ class VoiceAgentApp {
   }
 
   /* ============================================================================
-     4. WAVEFORM VISUALIZER RENDERING (Canvas)
+     5. WAVEFORM VISUALIZER RENDERING (Canvas)
      ============================================================================ */
   startActiveWaveform() {
     cancelAnimationFrame(this.animationId);
@@ -306,7 +405,7 @@ class VoiceAgentApp {
       const height = this.canvas.height;
       this.canvasCtx.clearRect(0, 0, width, height);
 
-      // Calcular gradiente según tema
+      // Colores según tema
       const style = getComputedStyle(document.documentElement);
       const colorStart = style.getPropertyValue("--waveform-gradient-start").trim() || "#6366f1";
       const colorMid = style.getPropertyValue("--waveform-gradient-mid").trim() || "#06b6d4";
@@ -324,12 +423,12 @@ class VoiceAgentApp {
 
       for (let i = 0; i < barCount; i++) {
         const val = this.dataArray[i * step] || 0;
-        const barHeight = Math.max(4, (val / 255) * (height * 0.75));
+        const barHeight = Math.max(6, (val / 255) * (height * 0.75));
         const x = i * (width / barCount) + (width / barCount - barWidth) / 2;
         const y = height / 2 - barHeight / 2;
 
         this.canvasCtx.fillStyle = gradient;
-        this.canvasCtx.shadowBlur = 10;
+        this.canvasCtx.shadowBlur = 12;
         this.canvasCtx.shadowColor = colorMid;
         this.canvasCtx.beginPath();
         this.canvasCtx.roundRect(x, y, barWidth, barHeight, 4);

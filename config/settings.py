@@ -54,7 +54,7 @@ if HAS_PYDANTIC:
         agent_name: str = Field(default="Aura", alias="AGENT_NAME")
         agent_language: str = Field(default="es", alias="AGENT_LANGUAGE")
         agent_system_prompt: str = Field(
-            default="Eres un asistente de voz en español, cordial, preciso y conversacional. Responde en frases cortas.",
+            default="Eres Aura, un asistente de voz en español, cordial, directo y muy conciso. Responde en frases cortas y naturales optimizadas para ser habladas en voz alta.",
             alias="AGENT_SYSTEM_PROMPT"
         )
 
@@ -62,7 +62,7 @@ if HAS_PYDANTIC:
         whisper_device: str = Field(default="auto", alias="WHISPER_DEVICE")
 
         ollama_base_url: str = Field(default="http://localhost:11434/v1", alias="OLLAMA_BASE_URL")
-        ollama_model: str = Field(default="llama3.2:3b", alias="OLLAMA_MODEL")
+        ollama_model: str = Field(default="qwen2.5:3b", alias="OLLAMA_MODEL")
 
         piper_voice_name: str = Field(default="es_ES-davefx-medium", alias="PIPER_VOICE_NAME")
         piper_model_path: Optional[str] = Field(default=None, alias="PIPER_MODEL_PATH")
@@ -80,7 +80,6 @@ if HAS_PYDANTIC:
         daily_room_url: Optional[str] = Field(default=None, alias="DAILY_ROOM_URL")
         daily_token: Optional[str] = Field(default=None, alias="DAILY_TOKEN")
 
-        # Configuración Servidor Web
         web_host: str = Field(default="0.0.0.0", alias="WEB_HOST")
         web_port: int = Field(default=8765, alias="WEB_PORT")
 
@@ -95,14 +94,14 @@ else:
         agent_name: str = "Aura"
         agent_language: str = "es"
         agent_system_prompt: str = (
-            "Eres un asistente de voz en español, cordial, preciso y conversacional. Responde en frases cortas."
+            "Eres Aura, un asistente de voz en español, cordial, directo y muy conciso. Responde en frases cortas y naturales optimizadas para ser habladas en voz alta."
         )
 
         whisper_model_size: str = "base"
         whisper_device: str = "auto"
 
         ollama_base_url: str = "http://localhost:11434/v1"
-        ollama_model: str = "llama3.2:3b"
+        ollama_model: str = "qwen2.5:3b"
 
         piper_voice_name: str = "es_ES-davefx-medium"
         piper_model_path: Optional[str] = None

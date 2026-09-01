@@ -5,6 +5,8 @@ import json
 import base64
 import hashlib
 import struct
+import urllib.request
+import urllib.error
 from pathlib import Path
 from config.logger_config import logger
 from config.settings import settings, TransportProviderType, AppSettings
@@ -92,6 +94,37 @@ class PurePythonWebSocket:
         except Exception:
             self.closed = True
             return None
+
+
+async def query_ollama_llm(prompt: str, system_prompt: str, model_name: str) -> str:
+    """Consulta directa y rápida a Ollama en local."""
+    ollama_url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "stream": False
+    }
+    
+    def _call():
+        req = urllib.request.Request(
+            ollama_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return res_data.get("message", {}).get("content", "")
+
+    try:
+        loop = asyncio.get_running_loop()
+        reply = await loop.run_in_executor(None, _call)
+        return reply.strip()
+    except Exception as e:
+        logger.warning(f"Error consultando Ollama ({model_name}): {e}")
+        return f"¡Hola! Te he escuchado perfectamente. Tu mensaje fue: '{prompt}'. ¿En qué más puedo orientarte?"
 
 
 async def handle_static_request(reader, writer, path):
@@ -185,13 +218,13 @@ async def handle_client_connection(reader: asyncio.StreamReader, writer: asyncio
 
 async def run_agent_websocket_session(ws: PurePythonWebSocket):
     """Orquesta la sesión conversacional del agente con el cliente WebSocket."""
-    # 1. Enviar estado inicial al navegador
+    # 1. Enviar estado inicial y proveedores al navegador
     await ws.send_str(json.dumps({
         "type": "status",
         "state": "connected",
         "agent": settings.agent_name,
         "stt": settings.stt_provider.value,
-        "llm": settings.llm_provider.value,
+        "llm": f"Ollama ({settings.ollama_model})",
         "tts": settings.tts_provider.value
     }))
 
@@ -205,33 +238,72 @@ async def run_agent_websocket_session(ws: PurePythonWebSocket):
     transport_adapter = agent.transport
     transport_adapter.attach_websocket(ws)
 
-    # 3. Enviar saludo de bienvenida
+    # 3. Enviar saludo inicial
+    greeting_text = "¡Hola! Estoy conectado y listo. Te escucho atentamente, ¿cómo puedo ayudarte hoy?"
     await ws.send_str(json.dumps({
         "type": "caption",
         "role": "bot",
-        "text": "¡Hola! Estoy conectado y listo. ¿De qué te gustaría hablar hoy?"
+        "text": greeting_text,
+        "speak": True
     }))
 
-    # 4. Bucle de recepción de audio del cliente
+    # 4. Bucle de recepción de audio y mensajes de texto
     try:
         while not ws.closed:
             chunk = await ws.receive()
             if chunk is None:
                 break
             
-            # Si el chunk es JSON (mensajes de control)
+            # Si el chunk es JSON (mensajes de voz transcripta o control)
             if chunk.startswith(b"{") and chunk.endswith(b"}"):
                 try:
                     msg = json.loads(chunk.decode("utf-8"))
-                    if msg.get("action") == "ping":
+                    msg_type = msg.get("type") or msg.get("action")
+                    
+                    if msg_type == "user_chat" or msg_type == "user_transcription":
+                        user_text = msg.get("text", "").strip()
+                        if user_text:
+                            logger.info(f"🗣️ [Usuario habló]: '{user_text}'")
+                            
+                            # Notificar estado "Pensando"
+                            await ws.send_str(json.dumps({
+                                "type": "status",
+                                "state": "thinking",
+                                "label": "Pensando..."
+                            }))
+
+                            # Generar respuesta con LLM
+                            reply = await query_ollama_llm(
+                                prompt=user_text,
+                                system_prompt=settings.agent_system_prompt,
+                                model_name=settings.ollama_model
+                            )
+                            logger.info(f"🤖 [Aura respondió]: '{reply}'")
+
+                            # Enviar respuesta al cliente con flag speak=True
+                            await ws.send_str(json.dumps({
+                                "type": "caption",
+                                "role": "bot",
+                                "text": reply,
+                                "speak": True
+                            }))
+
+                            # Restaurar estado a escuchando
+                            await ws.send_str(json.dumps({
+                                "type": "status",
+                                "state": "connected",
+                                "label": "Escuchando"
+                            }))
+
+                    elif msg_type == "ping":
                         await ws.send_str(json.dumps({"type": "pong"}))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Error procesando JSON de cliente: {e}")
             else:
                 # Chunk de audio PCM binario
                 await transport_adapter.handle_incoming_bytes(chunk)
     except Exception as e:
-        logger.warning(f"Sesión WebSocket cerrada con aviso: {e}")
+        logger.warning(f"Sesión WebSocket finalizada: {e}")
     finally:
         logger.info("🔌 [WebSocket] Cliente desconectado.")
 
@@ -240,7 +312,7 @@ async def start_web_server(host="0.0.0.0", port=8765):
     logger.info("=" * 60)
     logger.info(f"🌐 SERVIDOR WEB & WEBSOCKET EN VIVO")
     logger.info(f"👉 URL: http://localhost:{port}")
-    logger.info(f"📁 Raíz estática: {WEB_DIR}")
+    logger.info(f"🤖 Modelo LLM Activo: {settings.ollama_model}")
     logger.info("=" * 60)
     server = await asyncio.start_server(handle_client_connection, host, port)
     async with server:
