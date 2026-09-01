@@ -26,6 +26,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
   - [`ADR-0016`: Razonamiento de Parámetros Nativo del LLM y Reglas de Proactividad](adr/ADR-0016-llm-native-function-calling-and-proactivity-rules.md)
   - [`ADR-0017`: Discriminación Multi-Acción de Herramientas y Consulta en Vivo de Google Calendar](adr/ADR-0017-multi-tool-calendar-action-distinction-and-event-listing.md)
   - [`ADR-0018`: Enrutamiento Exhaustivo de Verbos de Recordatorio y Aislamiento de Grounding](adr/ADR-0018-reminder-verbs-and-grounding-heuristic-fix.md)
+  - [`ADR-0019`: Enrutamiento Cognitivo 100% LLM-First y Eliminación de Heurísticas](adr/ADR-0019-pure-llm-first-cognitive-routing-and-zero-regex.md)
 
 ---
 
@@ -52,6 +53,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 | [`UC-017`](use-cases/UC-017-llm-native-tool-calling-and-proactive-reasoning.md) | Razonamiento Nativo del LLM & Proactividad | LLM Function Call | [`SEQ-015`](diagrams/sequences/SEQ-015-llm-native-tool-dispatch.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-019`](../.agents/tasks/TASK-019-llm-native-tool-calling.md) | `APPROVED` |
 | [`UC-018`](use-cases/UC-018-calendar-event-query-and-multi-action-tool-calling.md) | Consulta y Despacho Multi-Herramienta | Multi-Tool Dispatch | [`SEQ-016`](diagrams/sequences/SEQ-016-calendar-query-and-multi-tool-dispatch.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-020`](../.agents/tasks/TASK-020-calendar-multi-tool-dispatch.md) | `APPROVED` |
 | [`UC-019`](use-cases/UC-019-reminder-synonym-routing-and-grounding-isolation.md) | Enrutamiento de Recordatorios & Aislamiento Web | Intent Routing | [`SEQ-017`](diagrams/sequences/SEQ-017-reminder-tool-routing.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-021`](../.agents/tasks/TASK-021-reminder-routing-fix.md) | `APPROVED` |
+| [`UC-020`](use-cases/UC-020-unified-llm-first-cognitive-router.md) | Enrutador Cognitivo 100% LLM-First | Pure LLM Agent | [`SEQ-018`](diagrams/sequences/SEQ-018-unified-llm-router-and-tool-orchestrator.md) | [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) | [`STM-001`](diagrams/state-machines/STM-001-agent-session-lifecycle.md) | [`TASK-022`](../.agents/tasks/TASK-022-unified-llm-router.md) | `APPROVED` |
 
 ---
 
@@ -75,6 +77,7 @@ Este índice actúa como la **matriz de navegación maestra** para todo el catá
 - [`SEQ-015`](diagrams/sequences/SEQ-015-llm-native-tool-dispatch.md) — Despacho de herramientas y generación estructurada por el LLM.
 - [`SEQ-016`](diagrams/sequences/SEQ-016-calendar-query-and-multi-tool-dispatch.md) — Consulta y verificación en vivo de Google Calendar sin alucinación.
 - [`SEQ-017`](diagrams/sequences/SEQ-017-reminder-tool-routing.md) — Enrutamiento robusto de recordatorios y aislamiento de búsqueda web.
+- [`SEQ-018`](diagrams/sequences/SEQ-018-unified-llm-router-and-tool-orchestrator.md) — Enrutamiento cognitivo unificado 100% LLM-First.
 
 ### Diagramas de Actividad / Flujos (`docs/diagrams/activities/`)
 - [`ACT-001`](diagrams/activities/ACT-001-audio-barge-in-interruption.md) — Lógica de detección de voz del usuario durante la reproducción del bot e interrupción inmediata (*Barge-in*).
