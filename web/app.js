@@ -306,7 +306,49 @@ class VoiceAgentApp {
   }
 
   formatText(text) {
-    return text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    let formatted = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // Botón oficial para Autorización OAuth2
+    formatted = formatted.replace(
+      /(https:\/\/accounts\.google\.com\/o\/oauth2\/[^\s\)]+)/g,
+      '<br/><a href="$1" target="_blank" class="oauth-connect-btn" style="display:inline-flex; align-items:center; gap:6px; margin:10px 0; background:linear-gradient(135deg, #6366f1, #4f46e5); color:#ffffff; padding:9px 16px; border-radius:8px; font-weight:600; text-decoration:none; box-shadow: 0 4px 12px rgba(99,102,241,0.35);">🔑 Autorizar Google Calendar en 1 Clic</a><br/>'
+    );
+    
+    // Botón oficial para Ver Evento en Google Calendar
+    formatted = formatted.replace(
+      /(https:\/\/(?:www\.)?google\.com\/calendar\/event[^\s\)]+)/g,
+      '<br/><a href="$1" target="_blank" class="gcal-event-btn" style="display:inline-flex; align-items:center; gap:6px; margin:10px 0; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:9px 16px; border-radius:8px; font-weight:600; text-decoration:none; box-shadow: 0 4px 12px rgba(16,185,129,0.35);">📅 Ver Evento en Google Calendar</a><br/>'
+    );
+    
+    return formatted;
+  }
+
+  async checkGoogleAuthParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("auth") === "success") {
+      this.addMessageToCurrentSession(
+        "bot",
+        "🎉 **¡Google Calendar Conectado con Éxito!** Las credenciales de Google Cloud han sido validadas y el token se guardó de forma permanente. Todos tus eventos quedarán creados físicamente en tu cuenta de Google."
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    try {
+      const res = await fetch("/api/google-calendar/auth-url");
+      if (res.ok) {
+        const data = await res.json();
+        const badge = document.getElementById("gcal-auth-badge");
+        if (badge) {
+          if (data.is_authenticated) {
+            badge.textContent = "● Conectado";
+            badge.style.color = "#10b981";
+          } else {
+            badge.textContent = "[🔑 Conectar]";
+            badge.style.color = "#f59e0b";
+          }
+        }
+      }
+    } catch (e) {}
   }
 
   async copyToClipboard(text, btnElement) {
@@ -533,6 +575,26 @@ class VoiceAgentApp {
     if (this.sidebarFilterInput) {
       this.sidebarFilterInput.addEventListener("input", () => this.renderSidebarHistory());
     }
+
+    // Google Calendar MCP Auth click
+    const gcalItem = document.getElementById("gcal-mcp-item");
+    if (gcalItem) {
+      gcalItem.addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/google-calendar/auth-url");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.auth_url) {
+              window.open(data.auth_url, "_blank");
+            }
+          }
+        } catch (e) {
+          console.warn("Error abriendo auth url:", e);
+        }
+      });
+    }
+
+    this.checkGoogleAuthParam();
 
     if (this.toggleMicBtn) {
       this.toggleMicBtn.addEventListener("click", () => {

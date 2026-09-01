@@ -127,21 +127,42 @@ class AutonomousReasoningEngine:
                     "summary": f"Evento '{title}' programado exitosamente para las {time_display}."
                 }
 
+            if sync_res.get("status") == "auth_required":
+                auth_url = sync_res.get("auth_url", "http://localhost:8765/oauth2callback")
+                await _emit_thought(
+                    "Autorización OAuth2 Requerida",
+                    f"Credenciales de Google Cloud válidas. Se requiere el consentimiento del usuario para escribir en Google Calendar. URL generada: {auth_url}",
+                    "observation"
+                )
+
+                augmented_prompt = (
+                    f"[AUTORIZACIÓN OAUTH2 REQUERIDA DE GOOGLE CLOUD]:\n"
+                    f"Las credenciales GOOGLE_CALENDAR_CLIENT_ID y CLIENT_SECRET en .env son válidas.\n"
+                    f"Para que Google permita insertar eventos en su calendario personal, el usuario debe autorizar el acceso una única vez haciendo clic en el siguiente enlace oficial:\n"
+                    f"{auth_url}\n\n"
+                    f"[SOLICITUD DEL USUARIO]:\n{user_prompt}\n\n"
+                    f"[INSTRUCCIÓN CRÍTICA]:\n"
+                    f"Indícale al usuario con entusiasmo que sus credenciales fueron reconocidas y que para completar la sincronización real con su Google Calendar solo debe hacer clic en el botón de autorización: {auth_url}. "
+                    f"Aclárale que tras autorizar, el evento '{title}' se creará automáticamente en su cuenta."
+                )
+                return augmented_prompt, thoughts_trace
+
+            html_link = sync_res.get("html_link", "")
             await _emit_thought(
-                "Confirmación de Evento",
-                f"Evento '{sync_res.get('event_title', title)}' creado exitosamente con ID '{sync_res.get('event_id', 'evt_123')}' para las {sync_res.get('scheduled_time', time_display)}.",
+                "Confirmación de Evento en Google Calendar API v3",
+                f"Evento '{sync_res.get('event_title', title)}' creado exitosamente con ID '{sync_res.get('event_id', 'evt_123')}' para las {sync_res.get('scheduled_time', time_display)}.{f' Enlace: {html_link}' if html_link else ''}",
                 "observation"
             )
 
             augmented_prompt = (
-                f"[ACCIÓN REAL DE HERRAMIENTA MCP EJECUTADA CON ÉXITO POR EL SISTEMA]:\n"
-                f"Has verificado las credenciales y ejecutado la herramienta de Google Calendar por tu cuenta.\n"
-                f"Acabas de agendar exitosamente el evento '{sync_res.get('event_title')}' para hoy a las {sync_res.get('scheduled_time')}.\n\n"
+                f"[ACCIÓN REAL DE GOOGLE CALENDAR API v3 EJECUTADA CON ÉXITO]:\n"
+                f"Has insertado físicamente el evento '{sync_res.get('event_title')}' en el Google Calendar del usuario para hoy a las {sync_res.get('scheduled_time')}.\n"
+                f"{f'Enlace oficial al evento de Google Calendar: {html_link}' if html_link else ''}\n\n"
                 f"[SOLICITUD DEL USUARIO]:\n{user_prompt}\n\n"
                 f"[INSTRUCCIÓN CRÍTICA - ZERO REFUSAL]:\n"
-                f"1. Confirma con entusiasmo, total seguridad y claridad que revisaste su configuración y que acabas de crear el evento '{sync_res.get('event_title')}' en su Google Calendar programado para las {sync_res.get('scheduled_time')}.\n"
-                f"2. ESTÁ ESTRICTAMENTE PROHIBIDO decir 'Lo siento', 'no puedo cumplir con esa solicitud' o 'debes ir a la página de Google Calendar a crearlo', ya que la acción YA FUE EJECUTADA por ti misma en este instante.\n"
-                f"3. Sé concisa, amable y profesional."
+                f"1. Confirma con total seguridad y entusiasmo que el evento '{sync_res.get('event_title')}' ha sido creado físicamente en su cuenta de Google Calendar para las {sync_res.get('scheduled_time')}.\n"
+                f"2. {f'Incluye el enlace para ver el evento: {html_link}' if html_link else ''}\n"
+                f"3. ESTÁ ESTRICTAMENTE PROHIBIDO decir 'Lo siento' o pedir acciones manuales."
             )
 
             return augmented_prompt, thoughts_trace
