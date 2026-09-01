@@ -6,19 +6,20 @@ Este documento es la instantánea del estado de la sesión para retomar el traba
 
 ## 📌 Estado Actual del Proyecto
 - **Fecha:** 2026-09-01
-- **Versión:** `1.8.0`
+- **Versión:** `2.0.0` (Major Semantic Release)
 - **Fase AI-SDLC:** Fase 4 (Cierre, Documentación, Tests y Tag Semántico)
-- **Estado General:** `ESTABLE / ENRUTAMIENTO DE RECORDATORIOS Y AISLAMIENTO DE BÚSQUEDA WEB COMPLETADOS`
+- **Estado General:** `ESTABLE / ARQUITECTURA 100% LLM-FIRST (PURE COGNITIVE ROUTER) COMPLETADA`
 
 ---
 
 ## 🎯 Resumen de Lo Completado
-1. **Aislamiento de Búsqueda Web (`GroundingService`):** Eliminada la heurística `len >= 4` para evitar que recordatorios personales caigan en DuckDuckGo Search.
-2. **Enrutamiento Exhaustivo de Recordatorios (`AutonomousReasoningEngine`):** Reconocimiento fluido de frases cotidianas (*"hazme recordar que tengo que descongelar el pollo"*, *"avísame"*, *"agéndame"*).
-3. **Despachador Multi-Herramienta de Calendario:** Discriminación entre creación, consulta en vivo (`list_real_events`) y eliminación (`delete_real_event`).
-4. **Google Calendar API v3 Real & OAuth2:** Inserción y auditoría física en la cuenta de Google con enlaces directos (`htmlLink`).
-5. **Gobernanza AI-SDLC:** `UC-001` a `UC-019`, `TASK-001` a `TASK-021`, `SEQ-001` a `SEQ-017`, `ADR-0001` a `ADR-0018`.
-6. **Eval Harness & Invariantes:** 21/21 tareas y 5/5 unit tests verificados con `demo_live.sh`.
+1. **Arquitectura 100% LLM-First (Zero Heuristic / Zero Regex):**
+   - Eliminadas de raíz todas las listas de palabras estáticas y regexes en Python.
+   - El modelo `llama3.1:8b` evalúa de forma autónoma el prompt, decide la herramienta (`google_calendar.create_event`, `list_events`, `delete_event`, `web_search`, `mcp_manager`, `none`), extrae parámetros y genera descripciones amables con emojis.
+2. **Desacoplamiento Puro de Herramientas:** `GroundingService` actúa como herramienta pura bajo demanda del router LLM.
+3. **Google Calendar API v3 Real & OAuth2:** Inserción, auditoría y borrado físico de eventos en la cuenta de Google con enlaces directos (`htmlLink`).
+4. **Gobernanza AI-SDLC:** `UC-001` a `UC-020`, `TASK-001` a `TASK-022`, `SEQ-001` a `SEQ-018`, `ADR-0001` a `ADR-0019`.
+5. **Eval Harness & Invariantes:** 22/22 tareas y 5/5 unit tests verificados con `demo_live.sh`.
 
 ---
 

@@ -75,8 +75,11 @@ class TestHexagonalArchitecture(unittest.TestCase):
         self.assertIsInstance(search_adapter, SearchPort)
 
         grounding = GroundingService(search_adapter)
-        self.assertTrue(grounding.should_search("¿Dónde queda la UNI?"))
-        self.assertFalse(grounding.should_search("hola"))
+        async def _test():
+            prompt = await grounding.search_and_augment("Universidad Nacional de Ingenieria", "¿Dónde queda la UNI?")
+            self.assertIn("[INFORMACIÓN VERIFICADA", prompt)
+            return True
+        asyncio.run(_test())
 
     def test_pipeline_assembly_with_ports(self):
         """Valida que el Core Pipeline Builder ensamble la tubería de Pipecat correctamente."""
